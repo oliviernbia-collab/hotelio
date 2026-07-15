@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "\\dev"
+    ],
+    "allow": [
+      "Bash(php artisan *)"
+    ]
+  }
+}
