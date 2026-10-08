@@ -136,7 +136,7 @@
 
                 <div class="product-img-wrap">
                     @if($product->image)
-                        <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}">
+                        <img src="{{ $product->image_url }}" alt="{{ $product->name }}">
                     @else
                         <img src="{{ asset('images/logo.png') }}" alt="{{ __('image par défaut') }}">
                     @endif

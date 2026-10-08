@@ -34,12 +34,26 @@ class Room extends Model
         'capacity',
         'superficie_m2',
         'description',
+        'image',
     ];
 
     protected $casts = [
         'price' => 'integer',
         'capacity' => 'integer',
     ];
+
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image) {
+            return null;
+        }
+        if (str_starts_with($this->image, 'http')) {
+            return $this->image;
+        }
+        return url('storage/' . $this->image);
+    }
 
     public function hotel()
     {

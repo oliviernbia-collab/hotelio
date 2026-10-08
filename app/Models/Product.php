@@ -24,4 +24,17 @@ class Product extends Model
         'price' => 'integer',
         'stock' => 'integer',
     ];
+
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image) {
+            return null;
+        }
+        if (str_starts_with($this->image, 'http')) {
+            return $this->image;
+        }
+        return url('storage/' . $this->image);
+    }
 }

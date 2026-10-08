@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Hotel;
+use App\Models\Room;
+use App\Models\Review;
+use App\Models\Reservation;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
@@ -79,5 +82,28 @@ class HomeController extends Controller
             : collect();
 
         return view('hotels.public', compact('hotels', 'cities', 'categories', 'totalCount', 'favoriteIds'));
+    }
+
+    public function hotelDetails(Hotel $hotel)
+    {
+        $rooms = Room::where('hotel_id', $hotel->id)->get();
+
+        $reviews = Review::where('hotel_id', $hotel->id)
+            ->where('status', 'approved')
+            ->with('user')
+            ->latest()
+            ->get();
+
+        $userReview = (auth()->check() && auth()->user()->role === 'client')
+            ? Review::where('hotel_id', $hotel->id)->where('user_id', auth()->id())->first()
+            : null;
+
+        $bookedRooms = Reservation::whereIn('room_id', $rooms->pluck('id'))
+            ->whereNotIn('status', ['annulée', 'cancelled', 'refusée'])
+            ->whereDate('checkout', '>=', now())
+            ->select('room_id', 'checkin', 'checkout')
+            ->get();
+
+        return view('hotels.details', compact('hotel', 'rooms', 'reviews', 'userReview', 'bookedRooms'));
     }
 }

@@ -113,7 +113,7 @@
         <div class="card">
 
             @if($hotel->image)
-                <img src="{{ asset('storage/' . $hotel->image) }}"
+                <img src="{{ $hotel->image_url }}"
                      alt="{{ __('Image de') }} {{ $hotel->name }}"
                      style="width:100%; height:180px; object-fit:cover; border-radius:12px; margin-bottom:1rem;">
             @else

@@ -1037,11 +1037,11 @@ nav{
   </div>
   <div class="cards">
     @forelse($hotelsAbidjan as $hotel)
-    @php $link = auth()->check() ? route('hotels.show', $hotel) : route('login'); @endphp
+    @php $link = route('hotels.details', $hotel); @endphp
     <div class="card">
       <div class="card-img">
         @if($hotel->image)
-          <img src="{{ str_starts_with($hotel->image,'http') ? $hotel->image : asset('storage/'.$hotel->image) }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
+          <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
         @else
           <img src="{{ asset('images/h1.jpg') }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
         @endif
@@ -1076,11 +1076,11 @@ nav{
   </div>
   <div class="cards">
     @forelse($hotelsYamoussoukro as $hotel)
-    @php $link = auth()->check() ? route('hotels.show', $hotel) : route('login'); @endphp
+    @php $link = route('hotels.details', $hotel); @endphp
     <div class="card">
       <div class="card-img">
         @if($hotel->image)
-          <img src="{{ str_starts_with($hotel->image,'http') ? $hotel->image : asset('storage/'.$hotel->image) }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
+          <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
         @else
           <img src="{{ asset('images/h5.jpg') }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
         @endif
@@ -1115,11 +1115,11 @@ nav{
   </div>
   <div class="cards">
     @forelse($hotelsSanPedro as $hotel)
-    @php $link = auth()->check() ? route('hotels.show', $hotel) : route('login'); @endphp
+    @php $link = route('hotels.details', $hotel); @endphp
     <div class="card">
       <div class="card-img">
         @if($hotel->image)
-          <img src="{{ str_starts_with($hotel->image,'http') ? $hotel->image : asset('storage/'.$hotel->image) }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
+          <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
         @else
           <img src="{{ asset('images/h16.jpg') }}" alt="{{ $hotel->name }}" loading="lazy" class="card-real-img">
         @endif

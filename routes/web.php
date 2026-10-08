@@ -28,6 +28,7 @@ Route::get('/locale/{locale}', function (string $locale) {
 Route::get('/', [HomeController::class, 'premiere'])->name('premiere');
 Route::post('/premiere', [HomeController::class, 'premierePost'])->name('premiere.post');
 Route::get('/hotels-en-ligne', [HomeController::class, 'hotelSearch'])->name('hotels.public');
+Route::get('/hotels-en-ligne/{hotel}', [HomeController::class, 'hotelDetails'])->name('hotels.details');
 
 // ─── Pages d'information (footer) ──────────────────────────────────────────
 Route::get('/page/{slug}', [PageController::class, 'show'])
@@ -94,6 +95,7 @@ Route::middleware('auth')->group(function () {
     // Paiement & facture (accessibles à tous les rôles connectés)
     Route::get('/reservations/{reservation}/paiement', [DashboardController::class, 'payment'])->name('reservations.payment');
     Route::post('/reservations/{reservation}/paiement', [DashboardController::class, 'processPayment'])->name('reservations.payment.process');
+    Route::get('/reservations/{reservation}/paiement/retour', [DashboardController::class, 'paymentCallback'])->name('reservations.payment.callback');
     Route::get('/reservations/{reservation}/facture', [DashboardController::class, 'invoice'])->name('reservations.invoice');
     Route::get('/reservations/{reservation}/confirmation', [DashboardController::class, 'success'])->name('reservations.success');
 
@@ -133,6 +135,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/rooms', [DashboardController::class, 'rooms'])->name('rooms.index');
         Route::post('/rooms', [DashboardController::class, 'storeRoom'])->name('rooms.store');
         Route::patch('/rooms/{room}/status', [DashboardController::class, 'updateRoomStatus'])->name('rooms.status');
+        Route::post('/rooms/{room}/image', [DashboardController::class, 'updateRoomImage'])->name('rooms.image');
         Route::delete('/rooms/{room}', [DashboardController::class, 'destroyRoom'])->name('rooms.destroy');
         Route::get('/clients', [DashboardController::class, 'clients'])->name('clients.index');
         Route::post('/clients', [DashboardController::class, 'storeClient'])->name('clients.store');

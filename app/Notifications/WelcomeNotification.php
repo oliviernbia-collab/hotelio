@@ -41,7 +41,7 @@ class WelcomeNotification extends Notification
     {
         return [
             'type'    => 'welcome',
-            'icon'    => 'fa-hand-wave',
+            'icon'    => 'fa-hands-clapping',
             'color'   => '#F77F00',
             'title'   => 'Bienvenue sur Hôtelio !',
             'message' => "Votre compte " . ucfirst($notifiable->role) . " est prêt. Explorez la plateforme !",

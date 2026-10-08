@@ -5,12 +5,13 @@
 
 @php
 $methodsMap = [
-    'Orange Money'     => ['icon'=>'🟠','sub'=>__('Paiement mobile sécurisé'),   'color'=>'#ff6600','slug'=>'orange-money'],
-    'MTN Mobile Money' => ['icon'=>'🟡','sub'=>__('Paiement mobile instantané'), 'color'=>'#ffcc00','slug'=>'mtn-mobile-money'],
-    'Wave'             => ['icon'=>'🔵','sub'=>__('Transfert rapide 0 frais'),   'color'=>'#1a9fff','slug'=>'wave'],
-    'Carte bancaire'   => ['icon'=>'💳','sub'=>'Visa, Mastercard, AMEX',     'color'=>'#1e3a5f','slug'=>'carte-bancaire'],
-    'Espèces'          => ['icon'=>'💵','sub'=>__('Payer à la réception'),        'color'=>'#15803d','slug'=>'especes'],
-    'Virement'         => ['icon'=>'🏦','sub'=>'IBAN, SWIFT',                 'color'=>'#4f46e5','slug'=>'virement'],
+    'Orange Money'     => ['img'=>'images/payment-methods/orange-money.svg', 'sub'=>__('Paiement mobile sécurisé'),   'bg'=>'#FF6600', 'slug'=>'orange-money',     'gateway'=>true],
+    'MTN Mobile Money' => ['img'=>'images/payment-methods/mtn-momo.png',     'sub'=>__('Paiement mobile instantané'), 'bg'=>'#003366', 'slug'=>'mtn-mobile-money', 'gateway'=>true],
+    'Wave'             => ['img'=>'images/payment-methods/wave.png',        'sub'=>__('Transfert rapide 0 frais'),   'bg'=>'#1DC8E5', 'slug'=>'wave',             'gateway'=>true],
+    'Moov Money'       => ['img'=>'images/payment-methods/moov.png',        'sub'=>__('Paiement mobile Moov'),       'bg'=>'#0B5FA5', 'slug'=>'moov-money',       'gateway'=>true],
+    'DJAMO'            => ['badge'=>'DJAMO',  'sub'=>__('Compte et carte DJAMO'),       'bg'=>'#6C2BD9', 'fg'=>'#fff',    'slug'=>'djamo',            'gateway'=>true],
+    'Espèces'          => ['fa'=>'fa-money-bill-wave',  'sub'=>__('Payer à la réception'), 'bg'=>'#15803d', 'fg'=>'#fff', 'slug'=>'especes',  'gateway'=>false],
+    'Virement'         => ['fa'=>'fa-building-columns', 'sub'=>'IBAN, SWIFT',              'bg'=>'#4f46e5', 'fg'=>'#fff', 'slug'=>'virement', 'gateway'=>false],
 ];
 $pm      = $reservation->payment_method ?? 'Orange Money';
 $pmData  = $methodsMap[$pm] ?? $methodsMap['Orange Money'];
@@ -28,7 +29,21 @@ $pmSlug  = $pmData['slug'];
 
     {{-- HEADER --}}
     <div class="card" style="margin-bottom:1.5rem;text-align:center;background:linear-gradient(135deg,rgba(247,127,0,.1),rgba(0,154,68,.08));border-color:var(--ci-orange-border);">
-        <div style="font-size:2.5rem;margin-bottom:.5rem;">{{ $pmData['icon'] }}</div>
+        <div style="display:flex;justify-content:center;margin-bottom:.5rem;">
+            @if(isset($pmData['img']))
+                <span style="width:72px;height:52px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;padding:6px;">
+                    <img src="{{ asset($pmData['img']) }}" alt="{{ $pm }}" style="max-width:100%;max-height:100%;object-fit:contain;">
+                </span>
+            @elseif(isset($pmData['fa']))
+                <span style="width:52px;height:52px;border-radius:14px;background:{{ $pmData['bg'] }};color:{{ $pmData['fg'] }};display:flex;align-items:center;justify-content:center;font-size:1.5rem;">
+                    <i class="fa-solid {{ $pmData['fa'] }}"></i>
+                </span>
+            @else
+                <span style="width:52px;height:52px;border-radius:14px;background:{{ $pmData['bg'] }};color:{{ $pmData['fg'] }};display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;">
+                    {{ $pmData['badge'] }}
+                </span>
+            @endif
+        </div>
         <div style="font-size:1.3rem;font-weight:700;">{{ __('Finaliser le paiement') }}</div>
         <p style="color:var(--text-secondary);margin:.25rem 0 0;">{{ __('Réservation') }} <code style="color:var(--ci-orange);">{{ $reservation->code }}</code></p>
     </div>
@@ -44,8 +59,14 @@ $pmSlug  = $pmData['slug'];
             </div>
 
             <div style="display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;border-radius:14px;border:2px solid var(--ci-orange-border);background:var(--ci-orange-dim);margin-bottom:1.5rem;">
-                <div style="width:48px;height:48px;border-radius:12px;background:{{ $pmData['color'] }}20;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;">
-                    {{ $pmData['icon'] }}
+                <div style="width:60px;height:48px;border-radius:12px;background:{{ isset($pmData['img']) ? '#fff' : $pmData['bg'] }};color:{{ $pmData['fg'] ?? '#000' }};display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:4px;">
+                    @if(isset($pmData['img']))
+                        <img src="{{ asset($pmData['img']) }}" alt="{{ $pm }}" style="max-width:100%;max-height:100%;object-fit:contain;">
+                    @elseif(isset($pmData['fa']))
+                        <i class="fa-solid {{ $pmData['fa'] }}" style="font-size:1.3rem;"></i>
+                    @else
+                        <span style="font-size:.68rem;font-weight:800;">{{ $pmData['badge'] }}</span>
+                    @endif
                 </div>
                 <div>
                     <div style="font-weight:700;font-size:1rem;color:var(--text-primary);">{{ $pm }}</div>
@@ -66,69 +87,13 @@ $pmSlug  = $pmData['slug'];
                     {{ __('Informations de paiement') }}
                 </div>
 
-                {{-- Orange Money --}}
-                @if($pmSlug === 'orange-money')
-                <div class="form-group">
-                    <label><i class="fa-solid fa-mobile-screen"></i> {{ __('Numéro Orange Money') }}</label>
-                    <input type="tel" name="pm_phone" placeholder="{{ __('Ex : 07 00 00 00 00') }}" maxlength="20">
-                </div>
-                <div class="form-group">
-                    <label><i class="fa-solid fa-user"></i> {{ __('Nom du titulaire du compte') }}</label>
-                    <input type="text" name="pm_holder" placeholder="{{ __('Nom complet') }}">
-                </div>
-                <div style="padding:.85rem 1rem;background:rgba(255,102,0,.08);border:1px solid rgba(255,102,0,.25);border-radius:12px;font-size:.82rem;color:#fdba74;margin-bottom:1rem;">
-                    <i class="fa-solid fa-circle-info"></i> {{ __('Vous recevrez un message de confirmation sur ce numéro après validation.') }}
-                </div>
-                @endif
-
-                {{-- MTN Mobile Money --}}
-                @if($pmSlug === 'mtn-mobile-money')
-                <div class="form-group">
-                    <label><i class="fa-solid fa-mobile-screen"></i> {{ __('Numéro MTN Mobile Money') }}</label>
-                    <input type="tel" name="pm_phone" placeholder="{{ __('Ex : 05 00 00 00 00') }}" maxlength="20">
-                </div>
-                <div class="form-group">
-                    <label><i class="fa-solid fa-user"></i> {{ __('Nom du titulaire du compte') }}</label>
-                    <input type="text" name="pm_holder" placeholder="{{ __('Nom complet') }}">
-                </div>
-                <div style="padding:.85rem 1rem;background:rgba(255,204,0,.08);border:1px solid rgba(255,204,0,.25);border-radius:12px;font-size:.82rem;color:#fde68a;margin-bottom:1rem;">
-                    <i class="fa-solid fa-circle-info"></i> {{ __('Un code de confirmation MTN MoMo sera envoyé par SMS.') }}
-                </div>
-                @endif
-
-                {{-- Wave --}}
-                @if($pmSlug === 'wave')
-                <div class="form-group">
-                    <label><i class="fa-solid fa-mobile-screen"></i> {{ __('Numéro Wave / Téléphone') }}</label>
-                    <input type="tel" name="pm_phone" placeholder="{{ __('Ex : 01 00 00 00 00') }}" maxlength="20">
-                </div>
-                <div style="padding:.85rem 1rem;background:rgba(26,159,255,.08);border:1px solid rgba(26,159,255,.25);border-radius:12px;font-size:.82rem;color:#93c5fd;margin-bottom:1rem;">
-                    <i class="fa-solid fa-circle-info"></i> {{ __("Transfert instantané sans frais — confirmez via l'application Wave.") }}
-                </div>
-                @endif
-
-                {{-- Carte bancaire --}}
-                @if($pmSlug === 'carte-bancaire')
-                <div class="form-group">
-                    <label><i class="fa-solid fa-credit-card"></i> {{ __('Numéro de carte') }}</label>
-                    <input type="text" name="pm_card_number" placeholder="1234 5678 9012 3456" maxlength="19" oninput="formatCard(this)">
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-                    <div class="form-group">
-                        <label><i class="fa-solid fa-calendar"></i> {{ __("Date d'expiration") }}</label>
-                        <input type="text" name="pm_expiry" placeholder="MM/AA" maxlength="5" oninput="formatExpiry(this)">
+                {{-- Moyens gérés par Jèko (redirection vers la page sécurisée de l'opérateur) --}}
+                @if($pmData['gateway'])
+                <div style="padding:1rem 1.1rem;background:{{ $pmData['bg'] }}14;border:1px solid {{ $pmData['bg'] }}55;border-radius:14px;font-size:.85rem;color:var(--text-secondary);line-height:1.7;margin-bottom:1rem;">
+                    <div style="font-weight:700;margin-bottom:.4rem;font-size:.92rem;color:var(--text-primary);">
+                        <i class="fa-solid fa-lock"></i> {{ __('Paiement sécurisé via Jèko') }}
                     </div>
-                    <div class="form-group">
-                        <label><i class="fa-solid fa-lock"></i> CVV</label>
-                        <input type="text" name="pm_cvv" placeholder="123" maxlength="4" inputmode="numeric">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label><i class="fa-solid fa-user"></i> {{ __('Nom sur la carte') }}</label>
-                    <input type="text" name="pm_holder" placeholder="NOM PRENOM" style="text-transform:uppercase;">
-                </div>
-                <div style="padding:.85rem 1rem;background:rgba(30,58,95,.15);border:1px solid rgba(30,58,95,.35);border-radius:12px;font-size:.82rem;color:#93c5fd;margin-bottom:1rem;">
-                    <i class="fa-solid fa-shield-halved"></i> {{ __('Paiement sécurisé 3D Secure — Visa, Mastercard, AMEX acceptés.') }}
+                    {{ __('Vous allez être redirigé vers la page de paiement sécurisée :pm pour finaliser la transaction depuis votre téléphone.', ['pm' => $pm]) }}
                 </div>
                 @endif
 
@@ -168,7 +133,9 @@ $pmSlug  = $pmData['slug'];
 
                 {{-- BOUTON --}}
                 <button type="submit" class="btn" style="width:100%;justify-content:center;font-size:1rem;padding:1rem;margin-top:.5rem;">
-                    <i class="fa-solid fa-lock"></i> {{ __('Confirmer et payer') }} {{ number_format($reservation->total, 0, ',', ' ') }} FCFA
+                    <i class="fa-solid {{ $pmData['gateway'] ? 'fa-arrow-right' : 'fa-lock' }}"></i>
+                    {{ $pmData['gateway'] ? __('Continuer vers le paiement') : __('Confirmer et payer') }}
+                    {{ number_format($reservation->total, 0, ',', ' ') }} FCFA
                 </button>
                 <p style="text-align:center;font-size:.8rem;color:var(--text-muted);margin-top:.75rem;">
                     <i class="fa-solid fa-shield-halved" style="color:var(--ci-green)"></i>
@@ -209,17 +176,5 @@ $pmSlug  = $pmData['slug'];
 
     </div>
 </div>
-
-<script>
-function formatCard(input) {
-    let v = input.value.replace(/\D/g, '').substring(0, 16);
-    input.value = v.replace(/(.{4})/g, '$1 ').trim();
-}
-function formatExpiry(input) {
-    let v = input.value.replace(/\D/g, '').substring(0, 4);
-    if (v.length >= 3) v = v.substring(0, 2) + '/' + v.substring(2);
-    input.value = v;
-}
-</script>
 
 @endsection

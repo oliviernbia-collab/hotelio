@@ -192,7 +192,7 @@
     <div class="hotel-card">
       <div class="hcard-img">
         @if($hotel->image)
-          <img src="{{ asset('storage/' . $hotel->image) }}" alt="{{ $hotel->name }}">
+          <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}">
         @else
           {{ $hotel->emoji ?? '🏨' }}
         @endif

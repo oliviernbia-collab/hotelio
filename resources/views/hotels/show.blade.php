@@ -61,13 +61,43 @@
         <div class="card">
             <div class="card-title"><span>Image</span></div>
             @if($hotel->image)
-                <img src="{{ str_starts_with($hotel->image, 'http') ? $hotel->image : asset('storage/' . $hotel->image) }}" alt="{{ $hotel->name }}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.5rem;">
+                <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}"
+                     style="width: 100%; height: 200px; object-fit: cover; border-radius: 0.5rem; cursor: pointer;"
+                     onclick="openGallery(0)" title="Cliquez pour voir les chambres en images">
+                <p style="margin:.5rem 0 0;font-size:.78rem;color:#94a3b8;text-align:center;">
+                    <i class="fa-solid fa-images"></i> Cliquez sur l'image pour voir les chambres
+                </p>
             @else
                 <div style="width: 100%; height: 200px; background: rgba(148, 163, 184, .08); border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #94a3b8;">
                     Aucune image
                 </div>
             @endif
         </div>
+    </div>
+
+    {{-- Galerie : image de l'hôtel + images des chambres --}}
+    @php
+        $galleryItems = collect();
+        if ($hotel->image) {
+            $galleryItems->push([
+                'src'   => $hotel->image_url,
+                'label' => $hotel->name,
+            ]);
+        }
+        foreach ($rooms as $room) {
+            if ($room->image_url) {
+                $galleryItems->push([
+                    'src'   => $room->image_url,
+                    'label' => 'Chambre ' . $room->number . ' — ' . $room->type,
+                ]);
+            }
+        }
+    @endphp
+    <div id="galleryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;flex-direction:column;padding:1.5rem;">
+        <button onclick="closeGallery()" style="position:absolute;top:1rem;right:1.5rem;background:none;border:none;color:#fff;font-size:1.8rem;cursor:pointer;line-height:1;">&times;</button>
+        <img id="galleryMainImg" src="" alt="" style="max-width:90vw;max-height:65vh;object-fit:contain;border-radius:.75rem;">
+        <div id="galleryLabel" style="color:#fff;margin-top:.75rem;font-size:.95rem;"></div>
+        <div id="galleryThumbs" style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap;justify-content:center;max-width:90vw;"></div>
     </div>
 
     {{-- Localisation Google Maps --}}
@@ -112,7 +142,12 @@
             <div class="card-title"><span>Chambres</span></div>
             <div class="grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); gap:1rem;">
                 @foreach($rooms->take(6) as $room)
-                    <div class="card-sm" style="background: rgba(148, 163, 184, .08);">
+                    <div class="card-sm" style="background: rgba(148, 163, 184, .08); {{ $room->image_url ? 'cursor:pointer;' : '' }}"
+                         @if($room->image_url) onclick="openGallery(0)" @endif>
+                        @if($room->image_url)
+                            <img src="{{ $room->image_url }}" alt="{{ $room->number }}"
+                                 style="width:100%;height:90px;object-fit:cover;border-radius:.5rem;margin-bottom:.5rem;">
+                        @endif
                         <div style="font-weight:700;">{{ $room->number }}</div>
                         <div style="color:#94a3b8; margin:.5rem 0;">{{ $room->type }}</div>
                         <div class="badge badge-secondary">{{ $room->status }}</div>
@@ -215,12 +250,13 @@
                     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;">
                         @php
                         $payMethods = [
-                            ['value'=>'Orange Money',    'label'=>'Orange Money',     'sub'=>'Paiement mobile sécurisé',   'icon'=>'🟠','bg'=>'#ff6600'],
-                            ['value'=>'MTN Mobile Money','label'=>'MTN Mobile Money', 'sub'=>'Paiement mobile instantané', 'icon'=>'🟡','bg'=>'#ffcc00'],
-                            ['value'=>'Wave',            'label'=>'Wave',             'sub'=>'Transfert rapide 0 frais',   'icon'=>'🔵','bg'=>'#1a9fff'],
-                            ['value'=>'Carte bancaire',  'label'=>'Carte bancaire',   'sub'=>'Visa, Mastercard, AMEX',     'icon'=>'💳','bg'=>'#1e3a5f'],
-                            ['value'=>'Espèces',         'label'=>'Espèces',          'sub'=>'Payer à la réception',       'icon'=>'💵','bg'=>'#15803d'],
-                            ['value'=>'Virement',        'label'=>'Virement bancaire','sub'=>'IBAN, SWIFT',                'icon'=>'🏦','bg'=>'#4f46e5'],
+                            ['value'=>'Orange Money',    'label'=>'Orange Money',     'sub'=>'Paiement mobile sécurisé',   'img'=>'images/payment-methods/orange-money.svg'],
+                            ['value'=>'MTN Mobile Money','label'=>'MTN Mobile Money', 'sub'=>'Paiement mobile instantané', 'img'=>'images/payment-methods/mtn-momo.png'],
+                            ['value'=>'Wave',            'label'=>'Wave',             'sub'=>'Transfert rapide 0 frais',   'img'=>'images/payment-methods/wave.png'],
+                            ['value'=>'Moov Money',      'label'=>'Moov Money',       'sub'=>'Paiement mobile Moov',       'img'=>'images/payment-methods/moov.png'],
+                            ['value'=>'DJAMO',           'label'=>'DJAMO',            'sub'=>'Compte et carte DJAMO',      'badge'=>'DJAMO',  'bg'=>'#6C2BD9', 'fg'=>'#fff'],
+                            ['value'=>'Espèces',         'label'=>'Espèces',          'sub'=>'Payer à la réception',       'fa'=>'fa-money-bill-wave', 'bg'=>'#15803d', 'fg'=>'#fff'],
+                            ['value'=>'Virement',        'label'=>'Virement bancaire','sub'=>'IBAN, SWIFT',                'fa'=>'fa-building-columns', 'bg'=>'#4f46e5', 'fg'=>'#fff'],
                         ];
                         $selectedPm = old('payment_method', 'Orange Money');
                         @endphp
@@ -232,7 +268,19 @@
                                     background:{{ $selectedPm === $pm['value'] ? 'var(--ci-orange-dim)' : 'var(--bg-input)' }};
                                     border-radius:12px;padding:.7rem .9rem;cursor:pointer;
                                     display:flex;align-items:center;gap:.6rem;transition:all .2s;">
-                            <span style="font-size:1.4rem;line-height:1;">{{ $pm['icon'] }}</span>
+                            @if(isset($pm['img']))
+                                <span style="width:42px;height:38px;border-radius:9px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:4px;">
+                                    <img src="{{ asset($pm['img']) }}" alt="{{ $pm['label'] }}" style="max-width:100%;max-height:100%;object-fit:contain;">
+                                </span>
+                            @elseif(isset($pm['fa']))
+                                <span style="width:38px;height:38px;border-radius:9px;background:{{ $pm['bg'] }};color:{{ $pm['fg'] }};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.05rem;">
+                                    <i class="fa-solid {{ $pm['fa'] }}"></i>
+                                </span>
+                            @else
+                                <span style="width:38px;height:38px;border-radius:9px;background:{{ $pm['bg'] }};color:{{ $pm['fg'] }};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.68rem;font-weight:800;letter-spacing:.01em;text-align:center;line-height:1.1;">
+                                    {{ $pm['badge'] }}
+                                </span>
+                            @endif
                             <div style="min-width:0;">
                                 <div style="font-weight:700;font-size:.82rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $pm['label'] }}</div>
                                 <div style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $pm['sub'] }}</div>
@@ -482,6 +530,40 @@ if (roomSelect)    roomSelect.addEventListener('change',    updatePrice);
 
 // Lancer au chargement si les dates sont déjà renseignées
 if (checkinInput?.value && checkoutInput?.value) checkAvailability();
+
+// ── Galerie hôtel + chambres ────────────────────────────────
+const GALLERY_ITEMS = @json($galleryItems);
+let galleryIndex = 0;
+
+function renderGallery() {
+    if (!GALLERY_ITEMS.length) return;
+    const item = GALLERY_ITEMS[galleryIndex];
+    document.getElementById('galleryMainImg').src = item.src;
+    document.getElementById('galleryMainImg').alt = item.label;
+    document.getElementById('galleryLabel').textContent = item.label;
+
+    const thumbs = document.getElementById('galleryThumbs');
+    thumbs.innerHTML = '';
+    GALLERY_ITEMS.forEach((it, i) => {
+        const t = document.createElement('img');
+        t.src = it.src;
+        t.title = it.label;
+        t.style.cssText = 'width:64px;height:48px;object-fit:cover;border-radius:.4rem;cursor:pointer;opacity:' + (i === galleryIndex ? '1' : '.5') + ';border:2px solid ' + (i === galleryIndex ? 'var(--ci-orange)' : 'transparent') + ';';
+        t.onclick = () => { galleryIndex = i; renderGallery(); };
+        thumbs.appendChild(t);
+    });
+}
+
+function openGallery(startIndex) {
+    if (!GALLERY_ITEMS.length) return;
+    galleryIndex = startIndex || 0;
+    renderGallery();
+    document.getElementById('galleryModal').style.display = 'flex';
+}
+
+function closeGallery() {
+    document.getElementById('galleryModal').style.display = 'none';
+}
 
 function selectPm(el) {
     document.querySelectorAll('.pm-card').forEach(c => {

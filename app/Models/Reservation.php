@@ -25,6 +25,8 @@ class Reservation extends Model
         'channel',
         'paid',
         'payment_method',
+        'jeko_reference',
+        'jeko_payment_request_id',
         'nationality',
         'checkin_at',
         'checkout_at',

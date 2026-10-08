@@ -54,6 +54,11 @@
             <div style="padding:1rem;background:var(--bg-input);border-radius:14px;border:1px solid var(--border);transition:border-color .2s;"
                  onmouseover="this.style.borderColor='var(--ci-orange-border)'"
                  onmouseout="this.style.borderColor='var(--border)'">
+                @if($room->image_url)
+                    <img src="{{ $room->image_url }}" alt="{{ $room->number }}"
+                         style="width:100%;height:110px;object-fit:cover;border-radius:10px;margin-bottom:.6rem;cursor:pointer;"
+                         onclick="window.open('{{ $room->image_url }}','_blank')">
+                @endif
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
                     <div style="font-weight:800;font-size:1.05rem;color:var(--text-primary);">
                         <i class="fa-solid fa-door-open" style="color:var(--ci-orange);font-size:.9rem;"></i>
@@ -118,6 +123,18 @@
                         </button>
                     </form>
                 </div>
+                {{-- Ajouter / remplacer l'image --}}
+                <form method="POST" action="{{ route('rooms.image', $room->id) }}" enctype="multipart/form-data"
+                      style="margin-top:.5rem;display:flex;gap:.4rem;">
+                    @csrf
+                    <input type="file" name="image" accept="image/*" required
+                           style="flex:1;font-size:.72rem;padding:.3rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);">
+                    <button type="submit"
+                            style="padding:.35rem .6rem;border-radius:8px;border:1px solid var(--ci-orange-border);background:var(--ci-orange-dim);color:var(--ci-orange);cursor:pointer;font-size:.78rem;white-space:nowrap;"
+                            title="{{ __("Enregistrer l'image") }}">
+                        <i class="fa-solid fa-upload"></i>
+                    </button>
+                </form>
             </div>
             @endforeach
         </div>
@@ -133,7 +150,7 @@
             <span><i class="fa-solid fa-plus-circle"></i> {{ __('Ajouter une chambre') }}</span>
         </div>
 
-        <form method="POST" action="{{ route('rooms.store') }}">
+        <form method="POST" action="{{ route('rooms.store') }}" enctype="multipart/form-data">
             @csrf
             <input type="hidden" name="hotel_id" value="{{ $hotelId }}">
 
@@ -182,6 +199,11 @@
             <div class="form-group">
                 <label><i class="fa-solid fa-align-left" style="color:var(--ci-orange)"></i> {{ __('Description (optionnel)') }}</label>
                 <textarea name="description" rows="2" placeholder="{{ __('Vue mer, balcon, climatisation...') }}"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fa-solid fa-image" style="color:var(--ci-orange)"></i> {{ __('Image de la chambre (optionnel)') }}</label>
+                <input type="file" name="image" accept="image/*">
             </div>
 
             <button type="submit" class="btn" style="width:100%;justify-content:center;">

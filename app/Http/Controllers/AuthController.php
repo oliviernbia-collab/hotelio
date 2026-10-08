@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Notifications\WelcomeNotification;
+use App\Services\CloudinaryUploader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -83,8 +84,8 @@ class AuthController extends Controller
 
         $permissions = null;
         if ($isPrestataire && $request->hasFile('proof_document')) {
-            $path = $request->file('proof_document')->store('proofs', 'public');
-            $permissions = ['proof_document' => $path, 'proof_status' => 'pending'];
+            $url = CloudinaryUploader::upload($request->file('proof_document'), 'proofs', 'auto');
+            $permissions = ['proof_document' => $url, 'proof_status' => 'pending'];
         }
 
         $user = User::create([

@@ -47,7 +47,7 @@
                 {{-- PHOTO --}}
                 <div style="flex-shrink:0;">
                     @if($member->photo)
-                        <img src="{{ asset('storage/' . $member->photo) }}"
+                        <img src="{{ $member->photo_url }}"
                              alt="{{ $member->first_name }}"
                              style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid var(--ci-orange-border);">
                     @else

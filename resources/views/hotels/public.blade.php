@@ -736,19 +736,15 @@ body::before{content:"";position:fixed;top:0;left:0;width:100%;height:4px;z-inde
         <div class="hotel-card">
           <div class="card-img" style="{{ !$hotel->image ? 'background:'.$grad : '' }}">
             @if($hotel->image)
-              <img src="{{ asset('storage/' . $hotel->image) }}" alt="{{ $hotel->name }}" loading="lazy">
+              <img src="{{ $hotel->image_url }}" alt="{{ $hotel->name }}" loading="lazy">
             @else
               <div class="card-img-placeholder">
                 <i class="fa-solid fa-hotel"></i>
                 <span>{{ $hotel->city }}</span>
               </div>
             @endif
-            {{-- Lien couvrant l'image : tap mobile = Voir & Réserver --}}
-            @auth
-              <a href="{{ route('hotels.show', $hotel) }}" class="card-img-link" aria-label="{{ $hotel->name }}"></a>
-            @else
-              <a href="{{ route('login') }}" class="card-img-link" aria-label="{{ $hotel->name }}"></a>
-            @endauth
+            {{-- Lien couvrant l'image : tap mobile = Voir les détails (accessible sans connexion) --}}
+            <a href="{{ route('hotels.details', $hotel) }}" class="card-img-link" aria-label="{{ $hotel->name }}"></a>
             <span class="card-badge {{ $hotel->stars >= 4 ? 'premium' : '' }}">{{ $hotel->category }}</span>
             @auth
               @if(auth()->user()->role === 'client')
@@ -792,15 +788,9 @@ body::before{content:"";position:fixed;top:0;left:0;width:100%;height:4px;z-inde
                 <i class="fa-solid fa-star"></i> {{ number_format($hotel->rating, 1) }}
               </div>
             </div>
-            @auth
-              <a href="{{ route('hotels.show', $hotel) }}" class="btn-book">
+            <a href="{{ route('hotels.details', $hotel) }}" class="btn-book">
                 <i class="fa-solid fa-eye"></i> {{ __('Voir & Réserver') }}
-              </a>
-            @else
-              <a href="{{ route('login') }}" class="btn-book">
-                <i class="fa-solid fa-calendar-check"></i> {{ __('Réserver') }}
-              </a>
-            @endauth
+            </a>
           </div>
         </div>
         @endforeach

@@ -19,13 +19,14 @@ use App\Models\Room;
 use App\Models\Staff;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Services\CloudinaryUploader;
+use App\Services\JekoClient;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
 {
@@ -227,7 +228,12 @@ class DashboardController extends Controller
             'price'       => 'required|integer|min:0',
             'capacity'    => 'required|integer|min:1',
             'description' => 'nullable|string|max:500',
+            'image'       => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
+
+        if ($request->hasFile('image')) {
+            $data['image'] = CloudinaryUploader::upload($request->file('image'), 'rooms');
+        }
 
         Room::create($data);
 
@@ -243,9 +249,24 @@ class DashboardController extends Controller
             ->with('success', 'Statut mis à jour.');
     }
 
+    public function updateRoomImage(Request $request, \App\Models\Room $room)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        CloudinaryUploader::destroy($room->image);
+
+        $room->update(['image' => CloudinaryUploader::upload($request->file('image'), 'rooms')]);
+
+        return redirect()->route('rooms.index', ['hotel_id' => $room->hotel_id])
+            ->with('success', 'Image de la chambre mise à jour.');
+    }
+
     public function destroyRoom(\App\Models\Room $room)
     {
         $hotelId = $room->hotel_id;
+        CloudinaryUploader::destroy($room->image);
         $room->delete();
 
         return redirect()->route('rooms.index', ['hotel_id' => $hotelId])
@@ -368,7 +389,7 @@ class DashboardController extends Controller
         ]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('staff', 'public');
+            $data['photo'] = CloudinaryUploader::upload($request->file('photo'), 'staff');
         }
 
         // Créer le compte utilisateur si demandé
@@ -411,10 +432,8 @@ class DashboardController extends Controller
         ]);
 
         if ($request->hasFile('photo')) {
-            if ($staff->photo) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($staff->photo);
-            }
-            $data['photo'] = $request->file('photo')->store('staff', 'public');
+            CloudinaryUploader::destroy($staff->photo);
+            $data['photo'] = CloudinaryUploader::upload($request->file('photo'), 'staff');
         }
 
         $staff->update(\Arr::except($data, ['permissions', 'create_account', 'account_email', 'account_pass']));
@@ -444,9 +463,7 @@ class DashboardController extends Controller
 
     public function destroyStaff(\App\Models\Staff $staff)
     {
-        if ($staff->photo) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($staff->photo);
-        }
+        CloudinaryUploader::destroy($staff->photo);
         $staff->delete();
 
         return redirect()->route('staff.index')->with('success', 'Personnel supprimé.');
@@ -838,7 +855,7 @@ class DashboardController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('images/hotels', 'public');
+            $data['image'] = CloudinaryUploader::upload($request->file('image'), 'hotels');
         }
 
         $data['user_id'] = Auth::id();
@@ -879,10 +896,8 @@ class DashboardController extends Controller
         }
 
         if ($request->hasFile('image')) {
-            if ($hotel->image && ! str_starts_with($hotel->image, 'http')) {
-                Storage::disk('public')->delete($hotel->image);
-            }
-            $data['image'] = $request->file('image')->store('images/hotels', 'public');
+            CloudinaryUploader::destroy($hotel->image);
+            $data['image'] = CloudinaryUploader::upload($request->file('image'), 'hotels');
         }
 
         $hotel->update($data);
@@ -892,9 +907,7 @@ class DashboardController extends Controller
 
     public function destroyHotel(Hotel $hotel)
     {
-        if ($hotel->image && ! str_starts_with($hotel->image, 'http')) {
-            Storage::disk('public')->delete($hotel->image);
-        }
+        CloudinaryUploader::destroy($hotel->image);
         $hotel->delete();
 
         return redirect()->route('hotels.index')->with('success', 'Hôtel supprimé avec succès.');
@@ -978,8 +991,7 @@ class DashboardController extends Controller
             try { $hotelOwner->notify(new ReservationCreatedNotification($reservation)); } catch (\Throwable) {}
         }
 
-        return redirect()->route('reservations.payment', $reservation)
-            ->with('success', 'Réservation enregistrée. Finalisez le paiement.');
+        return $this->initiatePayment($reservation, $data['payment_method']);
     }
 
     // ── Check-in : Réservée → Occupée ────────────────────────────────────────
@@ -1059,11 +1071,99 @@ class DashboardController extends Controller
             'payment_method' => 'required|string|max:80',
         ]);
 
-        $reservation->update([
-            'payment_method' => $data['payment_method'],
-            'paid'           => true,
-            'status'         => 'confirmée',
+        return $this->initiatePayment($reservation, $data['payment_method']);
+    }
+
+    /**
+     * Lance le paiement d'une réservation : confirmation immédiate pour Espèces/Virement,
+     * sinon redirection vers la page sécurisée Jèko. Appelé juste après la création d'une
+     * réservation (pas d'étape de confirmation intermédiaire) et depuis la page de paiement
+     * (reprise d'une réservation non payée, ex. depuis la liste des réservations).
+     */
+    private function initiatePayment(Reservation $reservation, string $paymentMethod)
+    {
+        if ($reservation->paid) {
+            return redirect()->route('reservations.success', $reservation);
+        }
+
+        $reservation->update(['payment_method' => $paymentMethod]);
+
+        $jekoMethod = JekoClient::mapPaymentMethod($paymentMethod);
+
+        // Espèces / Virement : aucune passerelle ne les gère, confirmation immédiate (comportement historique)
+        if (! $jekoMethod) {
+            $this->markReservationPaid($reservation);
+
+            return redirect()->route('reservations.success', $reservation)
+                ->with('success', 'Paiement confirmé. Un email de confirmation vous a été envoyé.');
+        }
+
+        $reference = 'HOTELIO-RES-' . $reservation->id . '-' . now()->timestamp;
+
+        $result = JekoClient::createPaymentRequest([
+            'storeId'     => config('services.jeko.store_id'),
+            'amountCents' => (int) round($reservation->total * 100),
+            'currency'    => 'XOF',
+            'reference'   => $reference,
+            'paymentDetails' => [
+                'type' => 'redirect',
+                'data' => [
+                    'paymentMethod' => $jekoMethod,
+                    'successUrl'    => route('reservations.payment.callback', ['reservation' => $reservation, 'result' => 'success']),
+                    'errorUrl'      => route('reservations.payment.callback', ['reservation' => $reservation, 'result' => 'error']),
+                ],
+            ],
         ]);
+
+        if (empty($result['redirectUrl'])) {
+            return redirect()->route('reservations.payment', $reservation)
+                ->with('error', $result['message'] ?? 'Impossible de lancer le paiement pour le moment. Réessayez ou choisissez un autre moyen de paiement.');
+        }
+
+        $reservation->update([
+            'jeko_reference'          => $reference,
+            'jeko_payment_request_id' => $result['id'] ?? null,
+        ]);
+
+        return redirect()->away($result['redirectUrl']);
+    }
+
+    /**
+     * Retour du client depuis la page de paiement Jèko (succès ou échec).
+     * La redirection seule ne prouve rien : on interroge l'API pour un retour immédiat,
+     * la confirmation définitive arrive via le webhook (voir JekoWebhookController).
+     */
+    public function paymentCallback(Request $request, Reservation $reservation)
+    {
+        if (! $reservation->paid && $reservation->jeko_payment_request_id) {
+            $result = JekoClient::getPaymentRequest($reservation->jeko_payment_request_id);
+            if (($result['status'] ?? null) === 'success') {
+                $this->markReservationPaid($reservation);
+            }
+        }
+
+        if ($reservation->paid) {
+            return redirect()->route('reservations.success', $reservation)
+                ->with('success', 'Paiement confirmé. Un email de confirmation vous a été envoyé.');
+        }
+
+        return redirect()->route('reservations.payment', $reservation)
+            ->with('error', $request->query('result') === 'error'
+                ? 'Le paiement a échoué ou a été annulé. Réessayez.'
+                : 'Paiement en cours de confirmation. Si le statut ne change pas sous peu, contactez le support.');
+    }
+
+    /**
+     * Confirme le paiement d'une réservation (appelé par le paiement manuel Espèces/Virement,
+     * le retour client, et le webhook Jèko). Idempotent.
+     */
+    public function markReservationPaid(Reservation $reservation): void
+    {
+        if ($reservation->paid) {
+            return;
+        }
+
+        $reservation->update(['paid' => true, 'status' => 'confirmée']);
 
         // Mettre à jour les stats du client
         $client = $reservation->client;
@@ -1078,16 +1178,16 @@ class DashboardController extends Controller
         $reservation->hotel->increment('checkins');
 
         // Email de confirmation (avec facture PDF en pièce jointe)
-        $recipient = optional($reservation->client)->email ?? Auth::user()?->email;
-        if ($recipient) {
-            try { Mail::to($recipient)->send(new ReservationConfirmed($reservation)); } catch (\Throwable) {}
+        $recipientUser = $client?->user;
+        $recipientEmail = $recipientUser?->email ?? $client?->email;
+        if ($recipientEmail) {
+            try { Mail::to($recipientEmail)->send(new ReservationConfirmed($reservation)); } catch (\Throwable) {}
         }
 
-        // Notification in-app + email au client connecté
-        try { Auth::user()->notify(new ReservationConfirmedNotification($reservation)); } catch (\Throwable) {}
-
-        return redirect()->route('reservations.success', $reservation)
-            ->with('success', 'Paiement confirmé. Un email de confirmation vous a été envoyé.');
+        // Notification in-app au client (si un compte est lié)
+        if ($recipientUser) {
+            try { $recipientUser->notify(new ReservationConfirmedNotification($reservation)); } catch (\Throwable) {}
+        }
     }
 
     public function invoice(Reservation $reservation)
@@ -1161,7 +1261,7 @@ class DashboardController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('images/products', 'public');
+            $data['image'] = CloudinaryUploader::upload($request->file('image'), 'products');
         }
 
         $data['user_id'] = Auth::id();
@@ -1194,10 +1294,8 @@ class DashboardController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            if ($product->image) {
-                Storage::disk('public')->delete($product->image);
-            }
-            $data['image'] = $request->file('image')->store('images/products', 'public');
+            CloudinaryUploader::destroy($product->image);
+            $data['image'] = CloudinaryUploader::upload($request->file('image'), 'products');
         }
 
         $product->update($data);
@@ -1212,9 +1310,7 @@ class DashboardController extends Controller
             abort(403);
         }
 
-        if ($product->image) {
-            Storage::disk('public')->delete($product->image);
-        }
+        CloudinaryUploader::destroy($product->image);
         $product->delete();
 
         return redirect()->route('products.index')->with('success', 'Produit supprimé.');

@@ -109,13 +109,16 @@
     @forelse($logs as $log)
 
     {{-- SÉPARATEUR PAR JOUR --}}
-    @if($currentDate !== $log->created_at->toDateString())
-        @php $currentDate = $log->created_at->toDateString(); @endphp
+    @php $logDate = $log->created_at?->toDateString() ?? __('Date inconnue'); @endphp
+    @if($currentDate !== $logDate)
+        @php $currentDate = $logDate; @endphp
         <div style="display:flex;align-items:center;gap:.75rem;margin:1.25rem 0 .75rem;">
             <div style="height:1px;flex:1;background:var(--border);"></div>
             <span style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);white-space:nowrap;padding:.25rem .75rem;background:var(--bg-input);border-radius:999px;border:1px solid var(--border);">
                 <i class="fa-solid fa-calendar-day"></i>
-                @if($log->created_at->isToday())
+                @if(!$log->created_at)
+                    {{ __('Date inconnue') }}
+                @elseif($log->created_at->isToday())
                     {{ __("Aujourd'hui") }} — {{ $log->created_at->format('d/m/Y') }}
                 @elseif($log->created_at->isYesterday())
                     {{ __('Hier') }} — {{ $log->created_at->format('d/m/Y') }}
@@ -177,7 +180,7 @@
                 {{ \App\Models\ActivityLog::actionLabel($log->action) }}
             </span>
             <div style="font-size:.72rem;color:var(--text-muted);margin-top:.25rem;">
-                {{ $log->created_at->format('H:i:s') }}
+                {{ $log->created_at?->format('H:i:s') ?? '—' }}
             </div>
         </div>
     </div>

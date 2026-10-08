@@ -22,3 +22,9 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Mobile app : dépôt Git indépendant (oliviernbia-collab/hotelio-mobile-frontend)
+/mobile
+
+# Archives locales
+*.zip

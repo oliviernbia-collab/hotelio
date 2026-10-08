@@ -28,6 +28,19 @@ class Staff extends Model
         'salary' => 'integer',
     ];
 
+    protected $appends = ['photo_url'];
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (! $this->photo) {
+            return null;
+        }
+        if (str_starts_with($this->photo, 'http')) {
+            return $this->photo;
+        }
+        return url('storage/' . $this->photo);
+    }
+
     public function hotel()
     {
         return $this->belongsTo(Hotel::class);

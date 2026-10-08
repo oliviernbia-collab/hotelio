@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'jeko' => [
+        'base_url' => env('JEKO_BASE_URL', 'https://api.jeko.africa'),
+        'store_id' => env('JEKO_STORE_ID'),
+        'api_key' => env('JEKO_API_KEY'),
+        'api_key_id' => env('JEKO_API_KEY_ID'),
+        'webhook_secret' => env('JEKO_WEBHOOK_SECRET'),
+    ],
+
 ];

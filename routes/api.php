@@ -21,8 +21,10 @@ use App\Http\Controllers\Api\BoutiqueController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\JekoWebhookController;
 
 // ─── Public ─────────────────────────────────────────────────────────────────
+Route::post('/webhooks/jeko', [JekoWebhookController::class, 'handle']);
 Route::post('/auth/login',           [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/auth/register',        [AuthController::class, 'register'])->middleware('throttle:5,1');
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');

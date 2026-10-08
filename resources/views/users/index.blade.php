@@ -90,7 +90,8 @@
                         {{ $user->status === 'en_attente' ? __('En attente') : ucfirst($user->status ?? 'actif') }}
                     </span>
                     @if($user->status === 'en_attente' && ($user->permissions['proof_document'] ?? null))
-                        <a href="{{ \Illuminate\Support\Facades\Storage::url($user->permissions['proof_document']) }}" target="_blank"
+                        @php $proofPath = $user->permissions['proof_document']; @endphp
+                        <a href="{{ str_starts_with($proofPath, 'http') ? $proofPath : \Illuminate\Support\Facades\Storage::url($proofPath) }}" target="_blank"
                            style="display:block;margin-top:.3rem;font-size:.72rem;color:var(--ci-orange);">
                             <i class="fa-solid fa-file-arrow-down"></i> {{ __('Voir le justificatif') }}
                         </a>

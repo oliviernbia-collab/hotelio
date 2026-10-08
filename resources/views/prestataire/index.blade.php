@@ -143,7 +143,7 @@
     <div class="hotel-mini">
       <div class="hotel-mini-img">
         @if($hotel->image)
-          <img src="{{ asset('storage/' . $hotel->image) }}" alt="">
+          <img src="{{ $hotel->image_url }}" alt="">
         @else
           {{ $hotel->emoji ?? '🏨' }}
         @endif

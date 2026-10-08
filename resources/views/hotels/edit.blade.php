@@ -85,7 +85,7 @@
                 <div class="form-group"><label>{{ __('Services (séparés par des virgules)') }}</label><input type="text" name="services" value="{{ old('services', is_array($hotel->services) ? implode(', ', $hotel->services) : $hotel->services) }}" placeholder="WiFi, Parking, Restaurant, Piscine"></div>
                 <div class="form-group"><label>{{ __("Image de l'hôtel") }}</label><input type="file" name="image" accept="image/*">
                 @if($hotel->image)
-                    <p>{{ __('Image actuelle:') }} <img src="{{ str_starts_with($hotel->image, 'http') ? $hotel->image : asset('storage/' . $hotel->image) }}" alt="{{ __('Image actuelle') }}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 0.5rem;"></p>
+                    <p>{{ __('Image actuelle:') }} <img src="{{ $hotel->image_url }}" alt="{{ __('Image actuelle') }}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 0.5rem;"></p>
                 @endif
                 </div>
                 <div class="form-group"><button class="btn" type="submit">{{ __("Mettre à jour l'hôtel") }}</button></div>

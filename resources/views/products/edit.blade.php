@@ -25,7 +25,7 @@
 
         @if($product->image)
         <div style="margin-bottom:1.5rem;border-radius:16px;overflow:hidden;height:200px;background:var(--bg-input);">
-            <img src="{{ asset('storage/' . $product->image) }}"
+            <img src="{{ $product->image_url }}"
                  alt="{{ $product->name }}"
                  style="width:100%;height:100%;object-fit:cover;">
         </div>

@@ -133,7 +133,7 @@
             <div style="display:flex;align-items:center;gap:.75rem;">
                 {{-- Image produit --}}
                 @if($ligne->product && $ligne->product->image)
-                <img src="{{ asset('storage/' . $ligne->product->image) }}"
+                <img src="{{ $ligne->product->image_url }}"
                      alt="{{ $ligne->product->name }}"
                      style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;">
                 @else
