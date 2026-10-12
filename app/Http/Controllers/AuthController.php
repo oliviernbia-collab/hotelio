@@ -62,7 +62,8 @@ class AuthController extends Controller
 
     public function showRegister()
     {
-        return view('auth.register');
+        $plans = \App\Models\SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get();
+        return view('auth.register', compact('plans'));
     }
 
     public function register(Request $request)
@@ -76,8 +77,13 @@ class AuthController extends Controller
                 Rule::requiredIf($request->input('role') === 'prestataire'),
                 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120',
             ],
+            'plan' => [
+                Rule::requiredIf($request->input('role') === 'prestataire'),
+                'nullable', 'string', 'in:starter,business,premium',
+            ],
         ], [
             'proof_document.required' => "Un justificatif de propriété est requis pour un compte hôtelier.",
+            'plan.required' => "Veuillez choisir un palier d'abonnement.",
         ]);
 
         $isPrestataire = $data['role'] === 'prestataire';
@@ -100,6 +106,15 @@ class AuthController extends Controller
         ]);
 
         if ($isPrestataire) {
+            $plan = \App\Models\SubscriptionPlan::where('slug', $data['plan'])->first();
+            if ($plan) {
+                \App\Models\Subscription::create([
+                    'user_id' => $user->id,
+                    'subscription_plan_id' => $plan->id,
+                    'status' => 'pending_payment',
+                ]);
+            }
+
             return redirect()->route('login')->with(
                 'success',
                 'Votre demande a bien été soumise, ' . $data['name'] . ' ! Un administrateur validera votre compte hôtelier sous 24–48 h.'

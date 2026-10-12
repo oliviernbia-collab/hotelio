@@ -1021,6 +1021,12 @@
                     <a href="{{ route('reports.index') }}" class="nav-link {{ request()->routeIs('reports.index') ? 'active' : '' }}">
                         <span class="nav-icon"><i class="fa-solid fa-chart-bar"></i></span><span>{{ __('Rapports') }}</span>
                     </a>
+                    <a href="{{ route('subscriptions.index') }}" class="nav-link {{ request()->routeIs('subscriptions.index') ? 'active' : '' }}">
+                        <span class="nav-icon"><i class="fa-solid fa-credit-card"></i></span><span>{{ __('Abonnements') }}</span>
+                    </a>
+                    <a href="{{ route('payouts.index') }}" class="nav-link {{ request()->routeIs('payouts.index') ? 'active' : '' }}">
+                        <span class="nav-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span><span>{{ __('Reversements') }}</span>
+                    </a>
                     <a href="{{ route('settings.index') }}" class="nav-link {{ request()->routeIs('settings.index') ? 'active' : '' }}">
                         <span class="nav-icon"><i class="fa-solid fa-gear"></i></span><span>{{ __('Paramètres') }}</span>
                     </a>

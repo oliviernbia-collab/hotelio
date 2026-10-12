@@ -32,6 +32,11 @@ class Reservation extends Model
         'checkout_at',
         'notes',
         'created_at',
+        'commission_rate',
+        'commission_amount',
+        'payout_transfer_id',
+        'payout_status',
+        'payout_failure_reason',
     ];
 
     protected $casts = [
@@ -44,6 +49,8 @@ class Reservation extends Model
         'checkin_at' => 'datetime',
         'checkout_at' => 'datetime',
         'created_at' => 'datetime',
+        'commission_rate' => 'decimal:2',
+        'commission_amount' => 'integer',
     ];
 
     public function hotel()

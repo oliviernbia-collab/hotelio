@@ -50,6 +50,43 @@ class JekoClient
     }
 
     /**
+     * Crée un contact bénéficiaire (mobile money ou bancaire) pour les virements sortants.
+     * `paymentMethod` : wave|orange_money|mtn|moov|djamo|bank.
+     */
+    public static function createContact(array $data): array
+    {
+        $response = Http::withHeaders([
+            'X-API-KEY' => config('services.jeko.api_key'),
+            'X-API-KEY-ID' => config('services.jeko.api_key_id'),
+        ])->post(config('services.jeko.base_url') . '/partner_api/contacts', $data);
+
+        return $response->json() ?? [];
+    }
+
+    public static function deleteContact(string $contactId): void
+    {
+        Http::withHeaders([
+            'X-API-KEY' => config('services.jeko.api_key'),
+            'X-API-KEY-ID' => config('services.jeko.api_key_id'),
+        ])->delete(config('services.jeko.base_url') . "/partner_api/contacts/{$contactId}");
+    }
+
+    /**
+     * Crée un virement sortant (reversement) vers un contact bénéficiaire déjà enregistré.
+     * Réponse de succès : contient `status` (pending|success). Réponse d'erreur : pas de
+     * `status`, contient `id` (code d'erreur) et `message` — voir la doc transfers/failure-reasons.
+     */
+    public static function createTransfer(array $data): array
+    {
+        $response = Http::withHeaders([
+            'X-API-KEY' => config('services.jeko.api_key'),
+            'X-API-KEY-ID' => config('services.jeko.api_key_id'),
+        ])->post(config('services.jeko.base_url') . '/partner_api/transfers', $data);
+
+        return $response->json() ?? [];
+    }
+
+    /**
      * Vérifie la signature HMAC-SHA256 d'un webhook Jèko (en-tête Jeko-Signature)
      * sur le corps BRUT de la requête, en comparaison à temps constant.
      */

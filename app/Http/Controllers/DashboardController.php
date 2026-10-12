@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class DashboardController extends Controller
@@ -91,10 +92,13 @@ class DashboardController extends Controller
         $todayCheckouts = Reservation::whereIn('hotel_id', $hotelIds)
             ->whereDate('checkout', today())->count();
 
+        $subscription = $user->currentSubscription();
+        $plans = $subscription ? collect() : \App\Models\SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get();
+
         return view('prestataire.index', compact(
             'myHotels', 'totalRooms', 'availableRooms', 'activeReservations',
             'totalRevenue', 'totalClients', 'recentReservations',
-            'todayCheckins', 'todayCheckouts'
+            'todayCheckins', 'todayCheckouts', 'subscription', 'plans'
         ));
     }
 
@@ -725,6 +729,7 @@ class DashboardController extends Controller
         }
 
         $totalRevenue      = (clone $query)->where('paid', true)->sum('total');
+        $totalCommissions  = (clone $query)->where('paid', true)->sum('commission_amount');
         $totalReservations = (clone $query)->count();
         $confirmedCount    = (clone $query)->where('status', 'confirmée')->count();
         $cancelledCount    = (clone $query)->where('status', 'annulée')->count();
@@ -753,7 +758,7 @@ class DashboardController extends Controller
         }
 
         return view('reports.index', compact(
-            'hotels', 'totalRevenue', 'totalReservations', 'avgRating',
+            'hotels', 'totalRevenue', 'totalCommissions', 'totalReservations', 'avgRating',
             'confirmedCount', 'cancelledCount', 'byNationality', 'byRoomType', 'period'
         ));
     }
@@ -819,6 +824,262 @@ class DashboardController extends Controller
         return view('settings.index');
     }
 
+    public function subscriptions(Request $request)
+    {
+        $query = \App\Models\Subscription::with(['user', 'plan']);
+        if ($request->filled('status')) {
+            $query->where('status', $request->get('status'));
+        }
+        $subscriptions = $query->latest()->paginate(20);
+
+        return view('admin.subscriptions.index', compact('subscriptions'));
+    }
+
+    public function payouts()
+    {
+        $prestataires = \App\Models\User::where('role', 'prestataire')
+            ->get()
+            ->map(function ($user) {
+                $user->owed         = $user->totalOwed();
+                $user->alreadyPaid  = (int) $user->payouts()->sum('amount');
+                $user->balance      = $user->owed - $user->alreadyPaid;
+                $user->lastPayout   = $user->payouts()->latest('paid_at')->first();
+                return $user;
+            })
+            ->sortByDesc('balance')
+            ->values();
+
+        $failedPayouts = Reservation::with(['hotel', 'client'])
+            ->where('payout_status', 'error')
+            ->latest()
+            ->get();
+
+        return view('admin.payouts.index', compact('prestataires', 'failedPayouts'));
+    }
+
+    /** Relance un virement automatique Jèko qui a échoué (contact invalide, solde insuffisant...). */
+    public function retryPayout(Reservation $reservation)
+    {
+        $reservation->update(['payout_transfer_id' => null, 'payout_status' => null, 'payout_failure_reason' => null]);
+        $this->triggerOwnerPayout($reservation);
+
+        $reservation->refresh();
+        if ($reservation->payout_status === 'error') {
+            return back()->with('error', 'Le virement a de nouveau échoué : ' . ($reservation->payout_failure_reason ?? 'raison inconnue'));
+        }
+
+        return back()->with('success', 'Virement relancé.');
+    }
+
+    public function recordPayout(Request $request, \App\Models\User $user)
+    {
+        $data = $request->validate([
+            'amount' => 'required|integer|min:1',
+            'notes'  => 'nullable|string|max:255',
+        ]);
+
+        if ($data['amount'] > $user->payoutBalance()) {
+            return back()->with('error', 'Le montant dépasse le solde dû (' . number_format($user->payoutBalance(), 0, ',', ' ') . ' FCFA).');
+        }
+
+        \App\Models\Payout::create([
+            'user_id'     => $user->id,
+            'amount'      => $data['amount'],
+            'notes'       => $data['notes'] ?? null,
+            'paid_at'     => now(),
+            'recorded_by' => Auth::id(),
+        ]);
+
+        return back()->with('success', 'Versement de ' . number_format($data['amount'], 0, ',', ' ') . ' FCFA enregistré pour ' . $user->name . '.');
+    }
+
+    public function recordSubscriptionPayment(Request $request, \App\Models\Subscription $subscription)
+    {
+        $amount = $request->integer('amount') ?: $subscription->plan->price_monthly;
+        $this->extendSubscriptionPeriod($subscription, $amount, $request->get('payment_method'), Auth::id());
+
+        return back()->with('success', 'Paiement enregistré, abonnement actif jusqu\'au ' . $subscription->fresh()->current_period_end->format('d/m/Y') . '.');
+    }
+
+    /** Prolonge l'abonnement d'un mois et journalise le paiement — manuel (admin) ou automatique (webhook Jèko). */
+    private function extendSubscriptionPeriod(\App\Models\Subscription $subscription, int $amount, ?string $paymentMethod, ?int $recordedBy): void
+    {
+        $periodStart = ($subscription->current_period_end && $subscription->current_period_end->isFuture())
+            ? $subscription->current_period_end
+            : now()->toDateString();
+        $periodEnd = \Carbon\Carbon::parse($periodStart)->addMonth();
+
+        \App\Models\SubscriptionPayment::create([
+            'subscription_id' => $subscription->id,
+            'amount'          => $amount,
+            'period_start'    => $periodStart,
+            'period_end'      => $periodEnd,
+            'payment_method'  => $paymentMethod,
+            'recorded_by'     => $recordedBy,
+            'paid_at'         => now(),
+        ]);
+
+        $subscription->update([
+            'status'              => 'active',
+            'started_at'          => $subscription->started_at ?? $periodStart,
+            'current_period_end'  => $periodEnd,
+        ]);
+    }
+
+    /** Active l'abonnement automatiquement après confirmation du paiement Jèko (webhook). */
+    public function activateSubscriptionFromPayment(\App\Models\Subscription $subscription): void
+    {
+        $this->extendSubscriptionPeriod($subscription, $subscription->plan->price_monthly, 'jeko', null);
+    }
+
+    /**
+     * Le prestataire paie lui-même son abonnement via Jèko (redirection, comme pour une
+     * réservation). L'activation se fait automatiquement au retour du webhook — voir
+     * activateSubscriptionFromPayment() et JekoWebhookController.
+     */
+
+    /**
+     * Permet à un prestataire sans abonnement (compte créé avant ce système, ou validé par
+     * un admin sans choix de palier) de choisir un palier a posteriori.
+     */
+    public function chooseSubscriptionPlan(Request $request)
+    {
+        if (Auth::user()->currentSubscription()) {
+            return back()->with('error', 'Vous avez déjà un abonnement.');
+        }
+
+        $data = $request->validate(['plan' => 'required|string|in:starter,business,premium']);
+        $plan = \App\Models\SubscriptionPlan::where('slug', $data['plan'])->firstOrFail();
+
+        \App\Models\Subscription::create([
+            'user_id' => Auth::id(),
+            'subscription_plan_id' => $plan->id,
+            'status' => 'pending_payment',
+        ]);
+
+        return back()->with('success', 'Palier ' . $plan->name . ' sélectionné — réglez le paiement pour activer votre abonnement.');
+    }
+
+    public function paySubscription(Request $request)
+    {
+        $subscription = Auth::user()->currentSubscription();
+        if (! $subscription) {
+            return back()->with('error', "Aucun abonnement trouvé sur votre compte.");
+        }
+
+        $data = $request->validate(['payment_method' => 'required|string|max:80']);
+        $jekoMethod = JekoClient::mapPaymentMethod($data['payment_method']);
+        if (! $jekoMethod) {
+            return back()->with('error', 'Moyen de paiement non pris en charge pour le paiement en ligne.');
+        }
+
+        $reference = 'HOTELIO-SUB-' . $subscription->id . '-' . now()->timestamp;
+
+        $result = JekoClient::createPaymentRequest([
+            'storeId'     => config('services.jeko.store_id'),
+            'amountCents' => (int) round($subscription->plan->price_monthly * 100),
+            'currency'    => 'XOF',
+            'reference'   => $reference,
+            'paymentDetails' => [
+                'type' => 'redirect',
+                'data' => [
+                    'paymentMethod' => $jekoMethod,
+                    'successUrl'    => route('subscription.payment.callback', ['result' => 'success']),
+                    'errorUrl'      => route('subscription.payment.callback', ['result' => 'error']),
+                ],
+            ],
+        ]);
+
+        if (empty($result['redirectUrl'])) {
+            return back()->with('error', $result['message'] ?? 'Impossible de lancer le paiement pour le moment. Réessayez ou choisissez un autre moyen de paiement.');
+        }
+
+        $subscription->update([
+            'jeko_reference'          => $reference,
+            'jeko_payment_request_id' => $result['id'] ?? null,
+        ]);
+
+        return redirect()->away($result['redirectUrl']);
+    }
+
+    /** Retour du prestataire depuis la page de paiement Jèko pour son abonnement. */
+    public function subscriptionPaymentCallback(Request $request)
+    {
+        $subscription = Auth::user()->currentSubscription();
+
+        if ($subscription && $subscription->status !== 'active' && $subscription->jeko_payment_request_id) {
+            $result = JekoClient::getPaymentRequest($subscription->jeko_payment_request_id);
+            if (($result['status'] ?? null) === 'success') {
+                $this->activateSubscriptionFromPayment($subscription);
+            }
+        }
+
+        if ($subscription && $subscription->status === 'active') {
+            return redirect()->route('prestataire.index')->with('success', 'Paiement confirmé, votre abonnement est actif.');
+        }
+
+        return redirect()->route('prestataire.index')->with('error', $request->query('result') === 'error'
+            ? 'Le paiement a échoué ou a été annulé. Réessayez.'
+            : 'Paiement en cours de confirmation. Si le statut ne change pas sous peu, contactez le support.');
+    }
+
+    /**
+     * Enregistre (ou remplace) les coordonnées de paiement du prestataire pour les
+     * reversements automatiques (mobile money ou RIB bancaire), et crée le contact
+     * bénéficiaire correspondant chez Jèko.
+     */
+    public function updatePayoutInfo(Request $request)
+    {
+        $user = Auth::user();
+
+        $data = $request->validate([
+            'payout_method' => 'required|string|in:wave,orange_money,mtn,moov,djamo,bank',
+            'phone_number'  => 'required_unless:payout_method,bank|nullable|string|max:20',
+            'bank_name'     => 'required_if:payout_method,bank|nullable|string|max:100',
+            'bank_code'     => 'required_if:payout_method,bank|nullable|string|max:20',
+            'swift_code'    => 'required_if:payout_method,bank|nullable|string|max:20',
+            'agency_code'   => 'required_if:payout_method,bank|nullable|string|max:20',
+            'account_number'=> 'required_if:payout_method,bank|nullable|string|max:40',
+            'rib_key'       => 'required_if:payout_method,bank|nullable|string|max:10',
+        ]);
+
+        $isBank = $data['payout_method'] === 'bank';
+        $identifier = $isBank
+            ? [
+                'bankName'      => $data['bank_name'],
+                'bankCode'      => $data['bank_code'],
+                'swiftCode'     => $data['swift_code'],
+                'agencyCode'    => $data['agency_code'],
+                'accountNumber' => $data['account_number'],
+                'key'           => $data['rib_key'],
+            ]
+            : ['number' => $data['phone_number']];
+
+        $result = JekoClient::createContact([
+            'name'          => $user->name,
+            'paymentMethod' => $data['payout_method'],
+            'identifier'    => $identifier,
+        ]);
+
+        if (empty($result['id'])) {
+            return back()->with('error', $result['message'] ?? "Impossible d'enregistrer ces coordonnées de paiement pour le moment.");
+        }
+
+        $oldContactId = $user->jeko_contact_id;
+
+        $user->update([
+            'payout_method'     => $data['payout_method'],
+            'payout_identifier' => $identifier,
+            'jeko_contact_id'   => $result['id'],
+        ]);
+
+        if ($oldContactId) {
+            try { JekoClient::deleteContact($oldContactId); } catch (\Throwable) {}
+        }
+
+        return back()->with('success', 'Coordonnées de paiement enregistrées.');
+    }
+
     public function profile()
     {
         $user   = Auth::user();
@@ -856,6 +1117,14 @@ class DashboardController extends Controller
 
         if ($request->hasFile('image')) {
             $data['image'] = CloudinaryUploader::upload($request->file('image'), 'hotels');
+        }
+
+        $subscription = Auth::user()->currentSubscription();
+        if ($subscription && $subscription->plan && $subscription->plan->max_hotels !== null) {
+            $currentCount = Hotel::where('user_id', Auth::id())->count();
+            if ($currentCount >= $subscription->plan->max_hotels) {
+                return back()->withInput()->with('error', "Quota d'hôtels atteint pour votre palier d'abonnement ({$subscription->plan->name}) — passez à un palier supérieur.");
+            }
         }
 
         $data['user_id'] = Auth::id();
@@ -1153,6 +1422,32 @@ class DashboardController extends Controller
                 : 'Paiement en cours de confirmation. Si le statut ne change pas sous peu, contactez le support.');
     }
 
+    /** Channels considérés comme "apportés par Hôtelio" (commissionnables) */
+    private const COMMISSIONABLE_CHANNELS = ['Site web', 'App mobile'];
+    private const DEFAULT_COMMISSION_RATE = 10.00;
+
+    /** Calcule et enregistre la commission Hôtelio sur une réservation au moment du paiement */
+    private function applyCommission(Reservation $reservation): void
+    {
+        if (! in_array($reservation->channel, self::COMMISSIONABLE_CHANNELS, true)) {
+            return;
+        }
+
+        $owner = $reservation->hotel?->user;
+        $rate = self::DEFAULT_COMMISSION_RATE;
+        if ($owner) {
+            $subscription = $owner->subscriptions()->where('status', 'active')->latest()->first();
+            if ($subscription && $subscription->plan) {
+                $rate = (float) $subscription->plan->commission_rate;
+            }
+        }
+
+        $reservation->update([
+            'commission_rate'   => $rate,
+            'commission_amount' => (int) round($reservation->total * $rate / 100),
+        ]);
+    }
+
     /**
      * Confirme le paiement d'une réservation (appelé par le paiement manuel Espèces/Virement,
      * le retour client, et le webhook Jèko). Idempotent.
@@ -1162,6 +1457,8 @@ class DashboardController extends Controller
         if ($reservation->paid) {
             return;
         }
+
+        $this->applyCommission($reservation);
 
         $reservation->update(['paid' => true, 'status' => 'confirmée']);
 
@@ -1190,6 +1487,57 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * Reverse automatiquement la part du propriétaire (total − commission) vers son contact
+     * Jèko (mobile money / banque), uniquement quand l'argent est réellement passé par le
+     * compte Jèko de la plateforme (réservation commissionnable). Appelé depuis le webhook
+     * Jèko après confirmation du paiement — jamais depuis le paiement Espèces/Virement
+     * (l'hôtel a déjà l'argent en main dans ce cas, rien à reverser).
+     */
+    public function triggerOwnerPayout(Reservation $reservation): void
+    {
+        if ($reservation->payout_transfer_id) {
+            return; // déjà déclenché (idempotence)
+        }
+        if (! in_array($reservation->channel, self::COMMISSIONABLE_CHANNELS, true)) {
+            return;
+        }
+
+        $owner = $reservation->hotel?->user;
+        if (! $owner || ! $owner->hasPayoutContact()) {
+            return; // propriétaire sans coordonnées de paiement enregistrées
+        }
+
+        $netAmount = $reservation->total - ($reservation->commission_amount ?? 0);
+        if ($netAmount < 5) {
+            return; // sous le minimum Jèko (500 centimes = 5 XOF)
+        }
+
+        $reference = 'PAYOUT-RES-' . $reservation->id;
+
+        $result = JekoClient::createTransfer([
+            'storeId'     => config('services.jeko.store_id'),
+            'contactId'   => $owner->jeko_contact_id,
+            'amountCents' => $netAmount * 100,
+            'currency'    => 'XOF',
+            'description' => 'Reversement réservation ' . $reservation->code,
+            'reference'   => $reference,
+        ]);
+
+        if (isset($result['status'])) {
+            $reservation->update([
+                'payout_transfer_id' => $result['id'] ?? null,
+                'payout_status'      => $result['status'],
+            ]);
+        } else {
+            Log::error('Échec du virement de reversement Jèko', ['reservation_id' => $reservation->id, 'result' => $result]);
+            $reservation->update([
+                'payout_status'         => 'error',
+                'payout_failure_reason' => $result['message'] ?? ($result['id'] ?? 'Erreur inconnue'),
+            ]);
+        }
+    }
+
     public function invoice(Reservation $reservation)
     {
         $pdf = Pdf::loadView('reservations.invoice', compact('reservation'));
@@ -1207,6 +1555,10 @@ class DashboardController extends Controller
             'status' => 'required|string|in:confirmée,annulée,en_attente,arrivée,départie',
         ]);
 
+        if ($request->status === 'annulée' && $reservation->status !== 'annulée' && $reservation->paid) {
+            $this->reverseCommissionAndStats($reservation);
+        }
+
         $reservation->update(['status' => $request->status]);
 
         // Notifier le client si annulation
@@ -1218,6 +1570,30 @@ class DashboardController extends Controller
         }
 
         return redirect()->back()->with('success', 'Statut de la réservation mis à jour.');
+    }
+
+    /**
+     * Annule les effets comptables de markReservationPaid() quand une réservation payée est
+     * annulée : la commission déjà calculée est remise à zéro et les statistiques (hôtel, client)
+     * sont décrémentées. Le paiement lui-même (`paid`) n'est pas touché — un éventuel remboursement
+     * reste géré manuellement par l'hôtel.
+     */
+    private function reverseCommissionAndStats(Reservation $reservation): void
+    {
+        $reservation->hotel?->decrement('revenue', min($reservation->total, $reservation->hotel->revenue));
+        if ($reservation->hotel && $reservation->hotel->checkins > 0) {
+            $reservation->hotel->decrement('checkins');
+        }
+
+        $client = $reservation->client;
+        if ($client) {
+            $client->decrement('total_spend', min($reservation->total, $client->total_spend));
+            if ($client->total_stays > 0) {
+                $client->decrement('total_stays');
+            }
+        }
+
+        $reservation->update(['commission_rate' => null, 'commission_amount' => null]);
     }
 
     private function isRoomBooked(int $hotelId, string $roomNumber, Carbon $checkin, Carbon $checkout): bool

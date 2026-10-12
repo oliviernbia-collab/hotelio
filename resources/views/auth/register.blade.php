@@ -151,6 +151,26 @@ h2{text-align:center;font-size:1.5rem;font-weight:600;margin-bottom:.4rem}
   background:var(--ci-orange);border-color:var(--ci-orange);color:white;
 }
 
+/* ── Plan selector ── */
+.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1rem}
+.plan-card{
+  border:2px solid rgba(148,163,184,.15);border-radius:14px;padding:.85rem .6rem;
+  cursor:pointer;text-align:center;transition:all .22s;
+  background:rgba(148,163,184,.04);
+}
+.plan-card:hover{border-color:rgba(247,127,0,.4);background:rgba(247,127,0,.06)}
+.plan-card.selected{border-color:var(--ci-orange);background:rgba(247,127,0,.12)}
+.plan-card input{display:none}
+.plan-name{font-weight:700;font-size:.85rem;margin-bottom:.25rem}
+.plan-price{font-size:.95rem;font-weight:800;color:var(--ci-orange);margin-bottom:.15rem}
+.plan-price small{font-size:.6rem;font-weight:500;color:#64748b}
+.plan-check{
+  width:16px;height:16px;border-radius:50%;border:2px solid rgba(148,163,184,.3);
+  margin:6px auto 0;display:flex;align-items:center;justify-content:center;
+  font-size:.55rem;color:transparent;transition:all .2s;
+}
+.plan-card.selected .plan-check{background:var(--ci-orange);border-color:var(--ci-orange);color:white}
+
 /* ── Form ── */
 .form-group{margin-bottom:1rem}
 .form-group label{
@@ -388,6 +408,24 @@ h2{text-align:center;font-size:1.5rem;font-weight:600;margin-bottom:.4rem}
         </p>
       </div>
 
+      <div id="planSection" style="display:none;">
+        <div class="role-section-label">
+          <i class="fa-solid fa-layer-group"></i> {{ __('Palier d\'abonnement') }}
+        </div>
+        <div class="plan-grid">
+          @foreach(($plans ?? []) as $plan)
+          <label class="plan-card {{ old('plan', request('plan')) === $plan->slug ? 'selected' : '' }}"
+                 onclick="selectPlan('{{ $plan->slug }}')">
+            <input type="radio" name="plan" value="{{ $plan->slug }}"
+                   {{ old('plan', request('plan')) === $plan->slug ? 'checked' : '' }}>
+            <div class="plan-name">{{ $plan->name }}</div>
+            <div class="plan-price">{{ number_format($plan->price_monthly, 0, ',', ' ') }} <small>FCFA/mois</small></div>
+            <div class="plan-check"><i class="fa-solid fa-check"></i></div>
+          </label>
+          @endforeach
+        </div>
+      </div>
+
       <div class="form-divider">
         <i class="fa-solid fa-user-pen" style="color:var(--ci-orange)"></i>
         {{ __('Vos informations') }}
@@ -468,10 +506,18 @@ function selectRole(role) {
 
   const proofSection  = document.getElementById('proofSection');
   const proofInput    = document.getElementById('proof_document');
+  const planSection   = document.getElementById('planSection');
   const isPrestataire = role === 'prestataire';
   proofSection.style.display = isPrestataire ? 'block' : 'none';
   proofInput.required = isPrestataire;
   if (!isPrestataire) proofInput.value = '';
+  planSection.style.display = isPrestataire ? 'block' : 'none';
+}
+function selectPlan(plan) {
+  document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`input[name="plan"][value="${plan}"]`).closest('.plan-card');
+  card.classList.add('selected');
+  document.querySelector(`input[name="plan"][value="${plan}"]`).checked = true;
 }
 document.addEventListener('DOMContentLoaded', () => {
   selectRole(document.querySelector('input[name="role"]:checked')?.value || 'client');

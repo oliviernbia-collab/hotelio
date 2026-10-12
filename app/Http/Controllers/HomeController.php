@@ -106,4 +106,10 @@ class HomeController extends Controller
 
         return view('hotels.details', compact('hotel', 'rooms', 'reviews', 'userReview', 'bookedRooms'));
     }
+
+    public function pricing()
+    {
+        $plans = \App\Models\SubscriptionPlan::where('is_active', true)->orderBy('sort_order')->get();
+        return view('pricing.index', compact('plans'));
+    }
 }

@@ -30,6 +30,76 @@
     </div>
 </div>
 @endif
+
+{{-- BANDEAU ABONNEMENT (PRESTATAIRE) --}}
+@if(auth()->user()->role === 'prestataire')
+@php
+    $subColor = match($subscription?->status) {
+        'active' => 'var(--ci-green)',
+        'past_due' => '#E63946',
+        default => 'var(--ci-orange)',
+    };
+    $subLabel = match($subscription?->status) {
+        'active' => __('Actif'),
+        'past_due' => __('Paiement en retard'),
+        'pending_payment' => __('En attente de paiement'),
+        default => __('Aucun abonnement'),
+    };
+@endphp
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:1rem;padding:1rem 1.25rem;background:{{ $subColor }}18;border:1px solid {{ $subColor }}40;border-radius:16px;margin-bottom:1.5rem;">
+    <div style="width:44px;height:44px;border-radius:12px;background:{{ $subColor }};display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:white;flex-shrink:0;">
+        <i class="fa-solid fa-credit-card"></i>
+    </div>
+    <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;color:var(--text-primary);">
+            {{ __('Abonnement') }} {{ $subscription?->plan->name ?? '—' }} — <span style="color:{{ $subColor }}">{{ $subLabel }}</span>
+        </div>
+        <div style="font-size:.82rem;color:var(--text-secondary);">
+            @if($subscription?->current_period_end)
+                {{ __('Échéance') }} : {{ $subscription->current_period_end->format('d/m/Y') }}
+            @else
+                {{ __("Aucun paiement enregistré pour l'instant.") }}
+            @endif
+        </div>
+    </div>
+    @if($subscription && $subscription->status !== 'active')
+    <form method="POST" action="{{ route('subscription.pay') }}" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+        @csrf
+        <select name="payment_method" required style="padding:.5rem .7rem;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:rgba(148,163,184,.06);color:inherit;font-size:.82rem;">
+            <option value="Orange Money">Orange Money</option>
+            <option value="MTN Mobile Money">MTN Mobile Money</option>
+            <option value="Wave">Wave</option>
+            <option value="Moov Money">Moov Money</option>
+            <option value="DJAMO">Djamo ({{ __('carte prépayée') }})</option>
+        </select>
+        <button type="submit" class="btn" style="padding:.55rem 1.1rem;font-size:.85rem;white-space:nowrap;">
+            <i class="fa-solid fa-credit-card"></i> {{ __('Payer mon abonnement') }} ({{ number_format($subscription->plan->price_monthly, 0, ',', ' ') }} FCFA)
+        </button>
+    </form>
+    @endif
+</div>
+
+@if(! $subscription)
+<div class="card" style="margin-bottom:1.5rem;border-color:var(--ci-orange-border)">
+    <div class="card-title"><span><i class="fa-solid fa-layer-group" style="color:var(--ci-orange)"></i> {{ __('Choisissez votre palier pour activer un abonnement') }}</span></div>
+    <form method="POST" action="{{ route('subscription.choose') }}">
+        @csrf
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem">
+            @foreach($plans as $plan)
+            <label style="cursor:pointer;border:2px solid rgba(148,163,184,.15);border-radius:14px;padding:1rem;text-align:center;display:block;">
+                <input type="radio" name="plan" value="{{ $plan->slug }}" {{ $loop->first ? 'checked' : '' }} style="margin-bottom:.5rem">
+                <div style="font-weight:700">{{ $plan->name }}</div>
+                <div style="font-size:1.2rem;font-weight:800;color:var(--ci-orange)">{{ number_format($plan->price_monthly, 0, ',', ' ') }}</div>
+                <div style="font-size:.72rem;color:#94a3b8">FCFA / {{ __('mois') }}</div>
+            </label>
+            @endforeach
+        </div>
+        <button type="submit" class="btn"><i class="fa-solid fa-check"></i> {{ __("Démarrer mon abonnement") }}</button>
+    </form>
+</div>
+@endif
+@endif
+
 <style>
 .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
 .stat-box{background:rgba(148,163,184,.06);border:1px solid rgba(148,163,184,.14);border-radius:14px;padding:1.25rem 1.5rem}

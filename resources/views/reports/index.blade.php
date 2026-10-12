@@ -65,6 +65,11 @@
     <div class="val" style="color:#3b82f6;">{{ number_format($avgRating ?? 4.5, 1) }} ★</div>
     <div class="sub">{{ __('Sur') }} {{ \App\Models\Review::count() }} {{ __('avis') }}</div>
   </div>
+  <div class="rbox" style="border-left:3px solid #a855f7">
+    <div class="lbl">{{ __('Commissions Hôtelio') }}</div>
+    <div class="val" style="color:#a855f7;">{{ $totalCommissions >= 1000000 ? number_format($totalCommissions/1000000,1).'M' : number_format($totalCommissions/1000,0).'K' }}</div>
+    <div class="sub">{{ __('FCFA sur réservations apportées par la plateforme') }}</div>
+  </div>
 </div>
 
 <div class="report-grid">

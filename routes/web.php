@@ -29,6 +29,7 @@ Route::get('/', [HomeController::class, 'premiere'])->name('premiere');
 Route::post('/premiere', [HomeController::class, 'premierePost'])->name('premiere.post');
 Route::get('/hotels-en-ligne', [HomeController::class, 'hotelSearch'])->name('hotels.public');
 Route::get('/hotels-en-ligne/{hotel}', [HomeController::class, 'hotelDetails'])->name('hotels.details');
+Route::get('/tarifs', [HomeController::class, 'pricing'])->name('pricing');
 
 // ─── Pages d'information (footer) ──────────────────────────────────────────
 Route::get('/page/{slug}', [PageController::class, 'show'])
@@ -88,6 +89,7 @@ Route::middleware('auth')->group(function () {
     });
     Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
     Route::post('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    Route::post('/profile/payout-info', [DashboardController::class, 'updatePayoutInfo'])->name('profile.payout-info');
 
     // Fiche hôtel (visible par tous les rôles connectés — booking)
     Route::get('/hotels/{hotel}', [DashboardController::class, 'hotel'])->name('hotels.show');
@@ -116,11 +118,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/settings', [DashboardController::class, 'settings'])->name('settings.index');
         Route::patch('/reviews/{review}/approve', [ReviewController::class, 'adminApprove'])->name('reviews.approve');
         Route::patch('/reviews/{review}/reject', [ReviewController::class, 'adminReject'])->name('reviews.reject');
+        Route::get('/admin/subscriptions', [DashboardController::class, 'subscriptions'])->name('subscriptions.index');
+        Route::post('/admin/subscriptions/{subscription}/payment', [DashboardController::class, 'recordSubscriptionPayment'])->name('subscriptions.payment');
+        Route::get('/admin/payouts', [DashboardController::class, 'payouts'])->name('payouts.index');
+        Route::post('/admin/payouts/{user}', [DashboardController::class, 'recordPayout'])->name('payouts.record');
+        Route::post('/admin/payouts/retry/{reservation}', [DashboardController::class, 'retryPayout'])->name('payouts.retry');
     });
 
     // ── Prestataire ──────────────────────────────────────────────────────────
     Route::middleware('role:prestataire')->group(function () {
         Route::get('/prestataire', [DashboardController::class, 'prestataire'])->name('prestataire.index');
+        Route::post('/abonnement/choisir', [DashboardController::class, 'chooseSubscriptionPlan'])->name('subscription.choose');
+        Route::post('/abonnement/payer', [DashboardController::class, 'paySubscription'])->name('subscription.pay');
+        Route::get('/abonnement/paiement/retour', [DashboardController::class, 'subscriptionPaymentCallback'])->name('subscription.payment.callback');
         Route::get('/hotels', [DashboardController::class, 'hotels'])->name('hotels.index');
         Route::get('/hotels/{hotel}/edit', [DashboardController::class, 'editHotel'])->name('hotels.edit');
         Route::post('/hotels', [DashboardController::class, 'storeHotel'])->name('hotels.store');

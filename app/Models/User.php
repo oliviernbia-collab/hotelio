@@ -17,6 +17,7 @@ class User extends Authenticatable
         'role', 'status', 'hotels',
         'permissions', 'staff_id',
         'two_fa_secret', 'two_fa_enabled',
+        'payout_method', 'payout_identifier', 'jeko_contact_id',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -25,6 +26,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password'          => 'hashed',
         'permissions'       => 'array',
+        'payout_identifier' => 'array',
     ];
 
     public function staff()
@@ -37,6 +39,56 @@ class User extends Authenticatable
     public function favoriteHotels()
     {
         return $this->belongsToMany(Hotel::class, 'favorites')->withPivot('created_at');
+    }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /** Abonnement le plus récent du prestataire (toutes statuts confondus) */
+    public function currentSubscription(): ?Subscription
+    {
+        return $this->subscriptions()->latest()->first();
+    }
+
+    public function payouts()
+    {
+        return $this->hasMany(Payout::class);
+    }
+
+    /**
+     * Montant total dû au prestataire : somme (total − commission) des réservations payées,
+     * non annulées, apportées par la plateforme (commissionnables), sur tous ses hôtels —
+     * à l'exclusion de celles déjà reversées automatiquement avec succès (virement Jèko).
+     * Ce montant est donc le solde qui reste à régler manuellement (fallback), pas le total
+     * historique : la plupart des réservations sont normalement déjà soldées par le virement
+     * automatique déclenché à l'encaissement (voir DashboardController::triggerOwnerPayout()).
+     */
+    public function totalOwed(): int
+    {
+        $hotelIds = \App\Models\Hotel::where('user_id', $this->id)->pluck('id');
+
+        return (int) \App\Models\Reservation::whereIn('hotel_id', $hotelIds)
+            ->where('paid', true)
+            ->where('status', '!=', 'annulée')
+            ->whereIn('channel', ['Site web', 'App mobile'])
+            ->where(function ($q) {
+                $q->whereNull('payout_status')->orWhere('payout_status', '!=', 'success');
+            })
+            ->selectRaw('COALESCE(SUM(total - COALESCE(commission_amount, 0)), 0) as owed')
+            ->value('owed');
+    }
+
+    /** Solde restant à verser = montant dû − versements déjà enregistrés */
+    public function payoutBalance(): int
+    {
+        return $this->totalOwed() - (int) $this->payouts()->sum('amount');
+    }
+
+    public function hasPayoutContact(): bool
+    {
+        return ! empty($this->jeko_contact_id);
     }
 
     /** IDs des hôtels auxquels cet utilisateur a accès */
