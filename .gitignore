@@ -1,30 +1,18 @@
 *.log
 .DS_Store
-.env
-.env.backup
-.env.production
 .phpactor.json
-.phpunit.result.cache
 /.fleet
 /.idea
 /.nova
-/.phpunit.cache
 /.vscode
 /.zed
-/auth.json
-/node_modules
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# Mobile app : dépôt Git indépendant (oliviernbia-collab/hotelio-mobile-frontend)
+# Apps indépendantes : dépôts Git séparés
 /mobile
+/backendMobile
 
 # Archives locales
 *.zip
