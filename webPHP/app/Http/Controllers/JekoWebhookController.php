@@ -93,9 +93,10 @@ class JekoWebhookController extends Controller
         $reservation = Reservation::where('jeko_reference', $reference)->first();
         if ($reservation) {
             if ($status === 'success') {
-                $dashboard = app(DashboardController::class);
-                $dashboard->markReservationPaid($reservation);
-                $dashboard->triggerOwnerPayout($reservation->fresh());
+                // Le reversement prestataire est volontairement retardé jusqu'au check-in réel
+                // (ou à la commande planifiée payouts:release-due) : tant que le séjour n'a pas
+                // commencé, l'argent doit pouvoir être intégralement remboursé en cas d'annulation.
+                app(DashboardController::class)->markReservationPaid($reservation);
             } elseif ($status === 'error' && ! $reservation->paid) {
                 $reservation->update(['status' => 'paiement_échoué']);
             }
@@ -110,9 +111,9 @@ class JekoWebhookController extends Controller
 
         $commande = Commande::where('jeko_reference', $reference)->first();
         if ($commande && $status === 'success' && $commande->statut !== 'payé') {
-            $commandeCtrl = app(CommandeController::class);
-            $commandeCtrl->markCommandePaid($commande);
-            $commandeCtrl->triggerOwnerPayouts($commande->fresh('lignes.product.user'));
+            // Idem réservations : le reversement prestataire attend la fenêtre d'annulation
+            // (payouts:release-due), pour que le remboursement reste possible entre-temps.
+            app(CommandeController::class)->markCommandePaid($commande);
         }
     }
 

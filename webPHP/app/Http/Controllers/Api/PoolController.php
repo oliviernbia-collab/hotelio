@@ -52,6 +52,14 @@ class PoolController extends Controller
         return response()->json($pool);
     }
 
+    public function destroy(Request $request, Pool $pool)
+    {
+        $this->checkAccess($request, $pool->hotel_id);
+        $pool->delete();
+
+        return response()->json(['message' => 'Piscine supprimée.']);
+    }
+
     private function checkAccess(Request $request, int $hotelId): void
     {
         $user = $request->user();

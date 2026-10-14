@@ -82,8 +82,9 @@ class TwoFAController extends Controller
             return back()->withErrors(['otp' => 'Code invalide. Vérifiez votre application Google Authenticator.']);
         }
 
-        Auth::login($user);
+        Auth::login($user, (bool) session('2fa_remember', false));
         $request->session()->forget('2fa_user_id');
+        $request->session()->forget('2fa_remember');
         $request->session()->put('2fa_verified', true);
         $request->session()->regenerate();
 

@@ -175,6 +175,29 @@
                             </a>
                             @endif
 
+                            {{-- Annulation avec remboursement (client) --}}
+                            @if(auth()->user()->role === 'client' && \App\Services\RefundService::canCancelReservation($res))
+                            @php
+                                $cancelAmounts = \App\Services\RefundService::splitAmounts($res->total);
+                                $cancelConfirm = __('Annuler cette réservation ?') . "\n"
+                                    . __('Frais de 5% retenus') . ' : ' . number_format($cancelAmounts['fee'], 0, ',', ' ') . ' FCFA'
+                                    . ' — ' . __('remboursé') . ' : ' . number_format($cancelAmounts['refundAmount'], 0, ',', ' ') . ' FCFA';
+                            @endphp
+                            <form method="POST" action="{{ route('client.reservations.cancel', $res) }}" onsubmit="return confirm({{ Illuminate\Support\Js::from($cancelConfirm) }})">
+                                @csrf
+                                <button type="submit" style="background:rgba(230,57,70,.15);color:#fca5a5;border:1px solid rgba(230,57,70,.3);border-radius:999px;padding:.35rem .8rem;font-size:.78rem;font-weight:700;cursor:pointer;">
+                                    {{ __('Annuler') }}
+                                </button>
+                            </form>
+                            @elseif(!$res->paid && $res->status !== 'annulée' && auth()->user()->role === 'client')
+                            <form method="POST" action="{{ route('client.reservations.cancel', $res) }}" onsubmit="return confirm('{{ __('Annuler cette réservation ?') }}')">
+                                @csrf
+                                <button type="submit" style="background:rgba(230,57,70,.15);color:#fca5a5;border:1px solid rgba(230,57,70,.3);border-radius:999px;padding:.35rem .8rem;font-size:.78rem;font-weight:700;cursor:pointer;">
+                                    {{ __('Annuler') }}
+                                </button>
+                            </form>
+                            @endif
+
                             {{-- Facture --}}
                             @if($res->paid)
                             <a href="{{ route('reservations.invoice', $res) }}" style="background:rgba(247,127,0,.15);color:#fed7aa;border:1px solid rgba(247,127,0,.3);border-radius:999px;padding:.35rem .8rem;font-size:.78rem;font-weight:700;display:inline-block;">

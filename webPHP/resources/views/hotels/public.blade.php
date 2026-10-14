@@ -610,19 +610,19 @@ body::before{content:"";position:fixed;top:0;left:0;width:100%;height:4px;z-inde
   <form method="GET" action="{{ route('hotels.public') }}" class="search-form">
     <div class="sf">
       <div class="sf-label">{{ __('Destination') }}</div>
-      <input class="sf-input" type="text" name="ville" placeholder="{{ __('Ville, quartier...') }}" value="{{ request('ville') }}">
+      <input class="sf-input" type="text" name="ville" placeholder="{{ __('Ville, quartier...') }}" value="{{ request('ville') }}" aria-label="{{ __('Destination') }}">
     </div>
     <div class="sf">
       <div class="sf-label">{{ __('Arrivée') }}</div>
-      <input class="sf-input" type="date" name="checkin" value="{{ request('checkin') }}">
+      <input class="sf-input" type="date" name="checkin" value="{{ request('checkin') }}" aria-label="{{ __('Date d\'arrivée') }}">
     </div>
     <div class="sf">
       <div class="sf-label">{{ __('Départ') }}</div>
-      <input class="sf-input" type="date" name="checkout" value="{{ request('checkout') }}">
+      <input class="sf-input" type="date" name="checkout" value="{{ request('checkout') }}" aria-label="{{ __('Date de départ') }}">
     </div>
     <div class="sf" style="max-width:150px">
       <div class="sf-label">{{ __('Étoiles min.') }}</div>
-      <select class="sf-input" name="stars">
+      <select class="sf-input" name="stars" aria-label="{{ __('Étoiles minimum') }}">
         <option value="">{{ __('Toutes') }}</option>
         @foreach([1,2,3,4,5] as $s)
           <option value="{{ $s }}" {{ request('stars') == $s ? 'selected' : '' }}>{{ $s }} ★</option>
@@ -669,6 +669,7 @@ body::before{content:"";position:fixed;top:0;left:0;width:100%;height:4px;z-inde
         @endforeach
         <input class="price-input" type="number" name="prix_max"
                placeholder="Max FCFA" value="{{ request('prix_max') }}" min="0" step="5000"
+               aria-label="{{ __('Prix maximum par nuit') }}"
                style="width:100%;padding:9px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;font-family:'Plus Jakarta Sans',sans-serif">
         <button type="submit" class="apply-filter">{{ __('Appliquer') }}</button>
       </form>
@@ -933,5 +934,6 @@ function showFavToast(msg, success) {
 @include('partials.public-footer')
 
 </div>{{-- .page-wrap --}}
+@include('partials.cookie-banner')
 </body>
 </html>

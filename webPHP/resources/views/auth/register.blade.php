@@ -270,7 +270,7 @@ h2{text-align:center;font-size:1.5rem;font-weight:600;margin-bottom:.4rem}
       <i class="fa-solid fa-shield-halved"></i> Paiement 100 % sécurisé
     </span>
     <span class="ticker-item">
-      <i class="fa-solid fa-rotate-left"></i> Annulation flexible <span class="ticker-badge">Gratuit</span>
+      <i class="fa-solid fa-rotate-left"></i> Remboursement jusqu'à 95%
     </span>
     <span class="ticker-item">
       <i class="fa-solid fa-headset"></i> Support 24 h / 7 j
@@ -308,7 +308,7 @@ h2{text-align:center;font-size:1.5rem;font-weight:600;margin-bottom:.4rem}
       <i class="fa-solid fa-shield-halved"></i> Paiement 100 % sécurisé
     </span>
     <span class="ticker-item">
-      <i class="fa-solid fa-rotate-left"></i> Annulation flexible <span class="ticker-badge">Gratuit</span>
+      <i class="fa-solid fa-rotate-left"></i> Remboursement jusqu'à 95%
     </span>
     <span class="ticker-item">
       <i class="fa-solid fa-headset"></i> Support 24 h / 7 j
@@ -532,5 +532,6 @@ setInterval(() => {
   slides[cur].classList.add('active');
 }, 4500);
 </script>
+@include('partials.cookie-banner')
 </body>
 </html>

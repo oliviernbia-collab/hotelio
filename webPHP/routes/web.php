@@ -24,6 +24,23 @@ Route::get('/locale/{locale}', function (string $locale) {
     return back();
 })->name('locale.switch');
 
+// ─── Retour paiement abonnement (app mobile) ───────────────────────────────
+// Page statique sans session : l'activation réelle se fait uniquement via le webhook
+// Jèko partagé (JekoWebhookController) — cf. Api\SubscriptionController::pay().
+Route::get('/mobile/subscription/callback', function (\Illuminate\Http\Request $request) {
+    $ok = $request->query('result') !== 'error';
+    $title = $ok ? '✅ Paiement confirmé' : '❌ Paiement annulé ou échoué';
+    $body  = $ok
+        ? "Vous pouvez fermer cette fenêtre et revenir à l'application."
+        : "Vous pouvez fermer cette fenêtre et réessayer dans l'application.";
+
+    return response(
+        '<!doctype html><html><head><meta charset="utf-8"><title>Hôtelio</title></head>'
+        . '<body style="font-family:sans-serif;text-align:center;padding:40px">'
+        . "<h2>{$title}</h2><p>{$body}</p></body></html>"
+    );
+})->name('subscription.payment.callback.mobile');
+
 // ─── Page d'accueil publique ────────────────────────────────────────────────
 Route::get('/', [HomeController::class, 'premiere'])->name('premiere');
 Route::post('/premiere', [HomeController::class, 'premierePost'])->name('premiere.post');
@@ -91,13 +108,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
     Route::post('/profile/payout-info', [DashboardController::class, 'updatePayoutInfo'])->name('profile.payout-info');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Fiche hôtel (visible par tous les rôles connectés — booking)
     Route::get('/hotels/{hotel}', [DashboardController::class, 'hotel'])->name('hotels.show');
 
     // Paiement & facture (accessibles à tous les rôles connectés)
     Route::get('/reservations/{reservation}/paiement', [DashboardController::class, 'payment'])->name('reservations.payment');
-    Route::post('/reservations/{reservation}/paiement', [DashboardController::class, 'processPayment'])->name('reservations.payment.process');
+    Route::post('/reservations/{reservation}/paiement', [DashboardController::class, 'processPayment'])->name('reservations.payment.process')->middleware('throttle:20,1');
     Route::get('/reservations/{reservation}/paiement/retour', [DashboardController::class, 'paymentCallback'])->name('reservations.payment.callback');
     Route::get('/reservations/{reservation}/facture', [DashboardController::class, 'invoice'])->name('reservations.invoice');
     Route::get('/reservations/{reservation}/confirmation', [DashboardController::class, 'success'])->name('reservations.success');
@@ -200,6 +218,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/client', [DashboardController::class, 'client'])->name('client.index');
         Route::get('/mes-reservations', [DashboardController::class, 'reservations'])->name('client.reservations');
         Route::post('/mes-reservations', [DashboardController::class, 'storeReservation'])->name('client.reservations.store');
+        Route::post('/mes-reservations/{reservation}/annuler', [DashboardController::class, 'cancelReservation'])->name('client.reservations.cancel');
         Route::get('/mes-commandes', [CommandeController::class, 'mesCommandes'])->name('client.commandes');
         Route::get('/mes-favoris', [FavoriteController::class, 'index'])->name('client.favorites');
     });
@@ -224,8 +243,8 @@ Route::get('/facturations/{facture}/pdf', [FactureController::class, 'pdf'])->na
 // Le paiement réel (redirection Jèko + confirmation côté serveur) a besoin d'un compte pour
 // savoir à qui confirmer/rattacher la commande : plus de "guest checkout" possible ici.
 Route::get('/commande/create', [CommandeController::class, 'create'])->name('commande.create')->middleware('auth');
-Route::post('/commande/store', [CommandeController::class, 'store'])->name('commande.store')->middleware('auth');
-Route::post('/commande/acheter', [CommandeController::class, 'buyNow'])->name('commande.buy-now')->middleware('auth');
+Route::post('/commande/store', [CommandeController::class, 'store'])->name('commande.store')->middleware(['auth', 'throttle:20,1']);
+Route::post('/commande/acheter', [CommandeController::class, 'buyNow'])->name('commande.buy-now')->middleware(['auth', 'throttle:20,1']);
 Route::get('/commande/success/{id}', [CommandeController::class, 'success'])->name('commande.success')->middleware('auth');
 Route::get('/commande/{id}/facture', [CommandeController::class, 'facture'])->name('commande.facture')->middleware('auth');
 Route::get('/admin/commandes', [CommandeController::class, 'commandes'])->name('admin.commandes')->middleware(['auth', 'role:admin']);

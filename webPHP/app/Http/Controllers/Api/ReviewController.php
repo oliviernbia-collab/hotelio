@@ -36,6 +36,23 @@ class ReviewController extends Controller
         return response()->json(['message' => 'Avis supprimé.']);
     }
 
+    /** Mirror de ReviewController::adminIndex (web). */
+    public function adminIndex(Request $request)
+    {
+        $status  = $request->query('status', 'pending');
+        $reviews = Review::with(['hotel', 'user'])
+            ->when($status !== 'all', fn ($q) => $q->where('status', $status))
+            ->latest()->paginate(20)->withQueryString();
+
+        $counts = [
+            'pending'  => Review::where('status', 'pending')->count(),
+            'approved' => Review::where('status', 'approved')->count(),
+            'rejected' => Review::where('status', 'rejected')->count(),
+        ];
+
+        return response()->json(['data' => $reviews, 'status' => $status, 'counts' => $counts]);
+    }
+
     public function approve(Request $request, Review $review)
     {
         $review->update(['status' => 'approved']);

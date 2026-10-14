@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BoutiqueTest extends TestCase
@@ -27,6 +28,22 @@ class BoutiqueTest extends TestCase
             'price' => 5000,
             'stock' => 10,
         ], $overrides));
+    }
+
+    /**
+     * orange_money/wave/mtn_momo/moov_money passent par une vraie demande de paiement Jèko
+     * (CommandeController::initiateCommandePayment) — on simule une réponse de succès pour ne
+     * pas dépendre du réseau ; sans ce fake, l'appel échoue et la commande est supprimée (voir
+     * la branche `empty($result['redirectUrl'])`).
+     */
+    private function fakeJekoPaymentRequest(): void
+    {
+        Http::fake([
+            'api.jeko.africa/*' => Http::response([
+                'id'          => 'req_test_'.uniqid(),
+                'redirectUrl' => 'https://pay.jeko.africa/test',
+            ], 200),
+        ]);
     }
 
     // ── Public boutique ──────────────────────────────────────────────────
@@ -100,6 +117,7 @@ class BoutiqueTest extends TestCase
 
     public function test_buy_now_creates_commande_with_payment_reference(): void
     {
+        $this->fakeJekoPaymentRequest();
         $user    = $this->client();
         $product = $this->makeProduct(['stock' => 5]);
 
@@ -155,6 +173,7 @@ class BoutiqueTest extends TestCase
 
     public function test_store_creates_commande_from_cart(): void
     {
+        $this->fakeJekoPaymentRequest();
         $user    = $this->client();
         $product = $this->makeProduct(['stock' => 10]);
 

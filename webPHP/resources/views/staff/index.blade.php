@@ -303,7 +303,7 @@ function previewPhoto(input) {
         const reader = new FileReader();
         reader.onload = e => {
             const preview = document.getElementById('photoPreview');
-            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+            preview.innerHTML = `<img src="${e.target.result}" alt="Aperçu de la photo" style="width:100%;height:100%;object-fit:cover;">`;
         };
         reader.readAsDataURL(input.files[0]);
     }
@@ -314,7 +314,7 @@ function previewEditPhoto(input) {
         const reader = new FileReader();
         reader.onload = e => {
             const preview = document.getElementById('editPhotoPreview');
-            preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+            preview.innerHTML = `<img src="${e.target.result}" alt="Aperçu de la photo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
         };
         reader.readAsDataURL(input.files[0]);
     }
@@ -337,7 +337,7 @@ function openEditModal(id) {
 
     const preview = document.getElementById('editPhotoPreview');
     if (d.photo) {
-        preview.innerHTML = `<img src="${d.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        preview.innerHTML = `<img src="${d.photo}" alt="Aperçu de la photo" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
     } else {
         preview.innerHTML = `<i class="fa-solid fa-user"></i>`;
     }

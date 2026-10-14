@@ -6,6 +6,7 @@ use App\Models\Commande;
 use App\Models\LigneCommande;
 use App\Models\Product;
 use App\Services\JekoClient;
+use App\Services\RefundService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -345,29 +346,19 @@ class CommandeController extends Controller
         return view('admin.commandes', compact('commandes', 'total', 'nb'));
     }
 
-    /** Annulation d'une commande par son client — réintègre le stock des produits commandés. */
+    /**
+     * Annulation d'une commande par son client avec remboursement réel (voir RefundService) :
+     * réintègre le stock, rembourse 95% du montant au client, verse 1% au(x) prestataire(s).
+     */
     public function cancel(Commande $commande)
     {
         if ($commande->user_id !== Auth::id()) {
             abort(403);
         }
 
-        if (! in_array($commande->statut, ['payé', 'payée'], true)) {
-            return back()->with('error', 'Cette commande ne peut plus être annulée.');
-        }
+        $result = RefundService::cancelCommande($commande);
 
-        foreach ($commande->lignes as $ligne) {
-            if ($ligne->product) {
-                $ligne->product->increment('stock', $ligne->quantite);
-            }
-            // La commission n'a plus lieu d'être comptée une fois la commande annulée (le
-            // virement déjà effectué, lui, n'est pas touché — un remboursement éventuel reste manuel).
-            $ligne->update(['commission_rate' => null, 'commission_amount' => null]);
-        }
-
-        $commande->update(['statut' => 'annulée']);
-
-        return back()->with('success', 'Commande annulée, les articles ont été remis en stock.');
+        return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
     public function mesCommandes(Request $request)

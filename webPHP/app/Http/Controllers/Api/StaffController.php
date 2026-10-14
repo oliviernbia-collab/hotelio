@@ -40,6 +40,24 @@ class StaffController extends Controller
         return response()->json(Staff::create($data), 201);
     }
 
+    /** Fiche employé de l'utilisateur connecté (rôle `employe`) — mirror backendMobile GET /staff/me. */
+    public function me(Request $request)
+    {
+        $staff = $request->user()->staff;
+        if (! $staff) {
+            return response()->json(['message' => "Aucune fiche employé n'est associée à votre compte."], 404);
+        }
+
+        return response()->json($staff->load('hotel:id,short_name'));
+    }
+
+    public function show(Request $request, Staff $staff)
+    {
+        $this->checkHotelAccess($request, $staff->hotel_id);
+
+        return response()->json($staff->load('hotel:id,short_name'));
+    }
+
     public function update(Request $request, Staff $staff)
     {
         $this->checkHotelAccess($request, $staff->hotel_id);

@@ -24,12 +24,15 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember')))
-        {
-            $user = Auth::user();
+        // Auth::validate() ne crée ni session ni cookie "remember" — on ne sait donc pas
+        // encore si l'utilisateur va passer par le 2FA au moment où les identifiants sont
+        // vérifiés, ce qui évite de poser un remember_token persistant qu'un Auth::logout()
+        // ultérieur ne retire jamais (le cookie réauthentifierait silencieusement l'utilisateur
+        // sans jamais redemander l'OTP).
+        if (Auth::validate($credentials)) {
+            $user = User::where('email', $credentials['email'])->first();
 
             if ($user->status !== 'actif') {
-                Auth::logout();
                 return back()->withErrors([
                     'email' => $user->status === 'en_attente'
                         ? "Votre compte est en attente de validation par un administrateur. Vous recevrez un accès sous 24–48 h."
@@ -37,13 +40,15 @@ class AuthController extends Controller
                 ])->onlyInput('email');
             }
 
-            // Vérification 2FA obligatoire si activée
+            // Vérification 2FA obligatoire si activée : le remember-me souhaité est mémorisé
+            // en session et n'est appliqué qu'après succès de l'OTP (TwoFAController::verify).
             if ($user->two_fa_enabled) {
                 $request->session()->put('2fa_user_id', $user->id);
-                Auth::logout();
+                $request->session()->put('2fa_remember', $request->boolean('remember'));
                 return redirect()->route('2fa.verify');
             }
 
+            Auth::login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             $request->session()->put('2fa_verified', true);
 
@@ -98,12 +103,14 @@ class AuthController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
+            'hotels' => 'Toutes les propriétés',
+        ]);
+        $user->forceFill([
             'role' => $data['role'],
             // Un hôtelier doit être validé par un admin avant de pouvoir se connecter.
             'status' => $isPrestataire ? 'en_attente' : 'actif',
-            'hotels' => 'Toutes les propriétés',
             'permissions' => $permissions,
-        ]);
+        ])->save();
 
         if ($isPrestataire) {
             $plan = \App\Models\SubscriptionPlan::where('slug', $data['plan'])->first();
@@ -132,6 +139,10 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        // Invalide le remember_token en base pour que le cookie "se souvenir de moi" ne
+        // puisse plus jamais réauthentifier silencieusement cet utilisateur après ce logout.
+        optional(Auth::user())->forceFill(['remember_token' => null])->save();
+
         Auth::logout();
 
         $request->session()->invalidate();

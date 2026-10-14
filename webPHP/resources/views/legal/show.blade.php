@@ -62,6 +62,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F8F5F0;color:var(--t
 </div>
 
 @include('partials.public-footer')
+@include('partials.cookie-banner')
 
 </body>
 </html>

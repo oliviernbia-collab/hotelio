@@ -37,6 +37,13 @@ class Reservation extends Model
         'payout_transfer_id',
         'payout_status',
         'payout_failure_reason',
+        'cancelled_at',
+        'cancellation_fee_amount',
+        'admin_fee_amount',
+        'refund_amount',
+        'refund_transfer_id',
+        'refund_status',
+        'refund_failure_reason',
     ];
 
     protected $casts = [
@@ -51,6 +58,10 @@ class Reservation extends Model
         'created_at' => 'datetime',
         'commission_rate' => 'decimal:2',
         'commission_amount' => 'integer',
+        'cancelled_at' => 'datetime',
+        'cancellation_fee_amount' => 'integer',
+        'admin_fee_amount' => 'integer',
+        'refund_amount' => 'integer',
     ];
 
     public function hotel()

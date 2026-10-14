@@ -30,6 +30,16 @@ class AuthController extends Controller
             return response()->json(['message' => 'Votre compte est désactivé.'], 403);
         }
 
+        if ($user->status === 'en_attente') {
+            return response()->json(['message' => 'Votre compte est en attente de validation par un administrateur.'], 403);
+        }
+
+        // Compte protégé par 2FA : pas de jeton immédiat, le client doit d'abord vérifier
+        // l'OTP via TwoFAController::verifyLogin (mirror backendMobile authController::login).
+        if ($user->two_fa_enabled) {
+            return response()->json(['requires_2fa' => true, 'user_id' => $user->id]);
+        }
+
         $token = $user->createToken('mobile-app')->plainTextToken;
 
         return response()->json([
@@ -78,6 +88,14 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Déconnecté avec succès.']);
+    }
+
+    /** Révoque tous les tokens Sanctum de l'utilisateur (ex: téléphone perdu/volé). */
+    public function logoutAll(Request $request)
+    {
+        $request->user()->tokens()->delete();
+
+        return response()->json(['message' => 'Déconnecté de tous les appareils.']);
     }
 
     public function me(Request $request)

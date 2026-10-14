@@ -13,9 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
-        // Relance automatiquement les virements Jèko en échec (réservations et achats),
+        // Relance automatiquement les virements Jèko en échec (réservations, achats, remboursements),
         // sans intervention d'un admin — nécessite `php artisan schedule:run` dans le cron système.
         $schedule->command('payouts:retry-failed')->everyThirtyMinutes()->withoutOverlapping();
+
+        // Libère les reversements prestataires une fois la fenêtre d'annulation dépassée
+        // (filet de sécurité pour les check-in jamais pointés dans l'app).
+        $schedule->command('payouts:release-due')->hourly()->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
@@ -24,6 +28,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
+            \App\Http\Middleware\TwoFAMiddleware::class,
+            \App\Http\Middleware\SecurityHeaders::class,
+        ]);
+        $middleware->api(append: [
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
         $middleware->statefulApi();
     })

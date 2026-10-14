@@ -91,7 +91,7 @@ class MigrateImagesToCloudinary extends Command
                 );
                 $permissions = $user->permissions;
                 $permissions['proof_document'] = $result['secure_url'];
-                $user->update(['permissions' => $permissions]);
+                $user->forceFill(['permissions' => $permissions])->save();
                 $this->line("  OK {$localPath} -> {$result['secure_url']}");
             } catch (\Throwable $e) {
                 $this->error("  ECHEC pour {$localPath} : {$e->getMessage()}");

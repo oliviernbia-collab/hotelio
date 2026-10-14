@@ -128,8 +128,10 @@
                     <form id="payoutForm{{ $p->id }}" method="POST" action="{{ route('payouts.record', $p) }}" class="hidden" style="margin-top:.6rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
                         @csrf
                         <input type="number" name="amount" value="{{ $p->balance }}" min="1" max="{{ $p->balance }}" required
+                               aria-label="{{ __('Montant du versement') }}"
                                style="width:140px;padding:.4rem .6rem;border-radius:8px;border:1px solid rgba(148,163,184,.25);background:rgba(148,163,184,.06);color:inherit;">
                         <input type="text" name="notes" placeholder="{{ __('Note (optionnel)') }}"
+                               aria-label="{{ __('Note') }}"
                                style="width:180px;padding:.4rem .6rem;border-radius:8px;border:1px solid rgba(148,163,184,.25);background:rgba(148,163,184,.06);color:inherit;">
                         <button type="submit" class="btn" style="padding:.4rem .9rem;font-size:.78rem;">{{ __('Confirmer') }}</button>
                     </form>

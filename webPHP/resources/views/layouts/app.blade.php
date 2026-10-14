@@ -928,10 +928,17 @@
         .topbar-search { display: none; }
         .content { padding: 1rem 1rem 2rem; }
         .cards-row, .grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-6 { grid-template-columns: 1fr; }
+        /* Filet générique AVANT les cas spécifiques ci-dessous : couvre tout motif de
+           grille inline non prévu, sans écraser les overrides plus précis qui suivent
+           (même spécificité CSS → la règle déclarée en dernier gagne). */
+        .grid[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
         .grid[style*="grid-template-columns: 1fr 1fr"], .grid[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
         .grid[style*="repeat(4"] { grid-template-columns: 1fr 1fr !important; }
         .card { padding: 1.1rem; border-radius: 16px; }
         .table th, .table td { padding: .65rem .6rem; font-size: .82rem; }
+        /* Scroll horizontal automatique pour tout tableau, qu'il soit déjà enveloppé dans
+           .table-responsive ou non (certaines vues oublient le wrapper). */
+        .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .topbar-user-name { display: none; }
         .lang-btn span:not(.lang-chevron) { display: none; }
     }
@@ -1279,7 +1286,7 @@
             <!-- Recherche -->
             <div class="topbar-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="search" placeholder="{{ __("Rechercher dans l'application…") }}">
+                <input type="search" placeholder="{{ __("Rechercher dans l'application…") }}" aria-label="{{ __("Rechercher dans l'application") }}">
             </div>
 
             <div class="topbar-right">
@@ -1886,5 +1893,6 @@ document.head.appendChild(style);
 @endauth
 </script>
 @stack('scripts')
+@include('partials.cookie-banner')
 </body>
 </html>

@@ -42,6 +42,13 @@ class TicketController extends Controller
         return response()->json(Ticket::create($data), 201);
     }
 
+    public function show(Request $request, Ticket $ticket)
+    {
+        $this->checkAccess($request, $ticket->hotel_id);
+
+        return response()->json($ticket->load(['hotel:id,short_name', 'client:id,first_name,last_name']));
+    }
+
     public function update(Request $request, Ticket $ticket)
     {
         $this->checkAccess($request, $ticket->hotel_id);

@@ -50,7 +50,7 @@ return [
     |
     */
 
-    'expiration' => null,
+    'expiration' => 60 * 24 * 30, // 30 jours — les tokens API mobile n'expiraient jamais auparavant
 
     /*
     |--------------------------------------------------------------------------

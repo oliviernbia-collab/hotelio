@@ -45,6 +45,23 @@ class ExpenseController extends Controller
         return response()->json(Expense::create($data), 201);
     }
 
+    public function update(Request $request, Expense $expense)
+    {
+        $this->checkAccess($request, $expense->hotel_id);
+
+        $data = $request->validate([
+            'description'  => 'sometimes|string',
+            'amount'       => 'sometimes|numeric|min:0',
+            'expense_type' => 'sometimes|string',
+            'occurred_at'  => 'nullable|date',
+            'notes'        => 'nullable|string',
+        ]);
+
+        $expense->update($data);
+
+        return response()->json($expense);
+    }
+
     public function destroy(Request $request, Expense $expense)
     {
         $this->checkAccess($request, $expense->hotel_id);

@@ -164,7 +164,7 @@ $pmSlug  = $pmData['slug'];
                 <div style="font-size:.82rem;color:#a7f3d0;display:flex;flex-direction:column;gap:.5rem;">
                     <span><i class="fa-solid fa-check"></i> {{ __('Confirmation instantanée') }}</span>
                     <span><i class="fa-solid fa-check"></i> {{ __('Facture PDF envoyée par email') }}</span>
-                    <span><i class="fa-solid fa-check"></i> {{ __('Annulation flexible') }}</span>
+                    <span><i class="fa-solid fa-check"></i> {{ __('Remboursement jusqu\'à 95% en cas d\'annulation') }}</span>
                     <span><i class="fa-solid fa-check"></i> {{ __('Support 24h/24') }}</span>
                 </div>
             </div>

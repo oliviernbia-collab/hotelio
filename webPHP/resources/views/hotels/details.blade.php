@@ -511,5 +511,6 @@ if (checkoutInput) checkoutInput.addEventListener('change', checkAvailability);
 if (roomSelect)    roomSelect.addEventListener('change',    updatePrice);
 if (checkinInput?.value && checkoutInput?.value) checkAvailability();
 </script>
+@include('partials.cookie-banner')
 </body>
 </html>

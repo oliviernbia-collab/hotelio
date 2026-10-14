@@ -64,4 +64,32 @@ class ProfileController extends Controller
 
         return back()->with('success', 'Mot de passe modifié avec succès.');
     }
+
+    /**
+     * Désactivation de compte en self-service : passe le statut à `inactif` (bloque la
+     * connexion, cf. AuthController::login) sans supprimer les données liées (réservations,
+     * factures, hôtel...). La suppression définitive des données reste une démarche
+     * manuelle (confidentialite@hotelio.ci, cf. politique de confidentialité).
+     */
+    public function destroy(Request $request)
+    {
+        $request->validate(['password' => 'required']);
+
+        $user = Auth::user();
+
+        if (! Hash::check($request->password, $user->password)) {
+            return back()->withErrors(['password' => 'Mot de passe incorrect.'], 'destroyAccount');
+        }
+
+        $user->forceFill(['status' => 'inactif'])->save();
+
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('login')->with(
+            'success',
+            'Votre compte a été désactivé. Contactez-nous à confidentialite@hotelio.ci pour le réactiver ou demander la suppression définitive de vos données.'
+        );
+    }
 }

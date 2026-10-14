@@ -12,10 +12,14 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
+    // 'role', 'status', 'permissions' et 'staff_id' sont volontairement ABSENTS du
+    // mass-assignment : ce sont des champs d'autorisation/privilège qui ne doivent jamais
+    // pouvoir être peuplés depuis un tableau de requête, même validé — ils sont assignés
+    // explicitement via forceFill() dans les quelques contrôleurs qui en ont légitimement
+    // besoin (DashboardController::storeStaff/storeUser/updateUser, AuthController::register,
+    // Api\UserController::store/update).
     protected $fillable = [
-        'name', 'email', 'password', 'avatar',
-        'role', 'status', 'hotels',
-        'permissions', 'staff_id',
+        'name', 'email', 'password', 'avatar', 'hotels',
         'two_fa_secret', 'two_fa_enabled',
         'payout_method', 'payout_identifier', 'jeko_contact_id',
     ];

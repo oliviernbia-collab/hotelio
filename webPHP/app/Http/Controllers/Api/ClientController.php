@@ -95,4 +95,26 @@ class ClientController extends Controller
 
         return response()->json($client);
     }
+
+    public function destroy(Request $request, Client $client)
+    {
+        $this->authorizeClient($request, $client);
+        $client->delete();
+
+        return response()->json(['message' => 'Client supprimé.']);
+    }
+
+    /** Mirror de DashboardController::addClientPoints (web). */
+    public function addPoints(Request $request, Client $client)
+    {
+        $this->authorizeClient($request, $client);
+
+        $data = $request->validate(['points' => 'required|integer']);
+
+        $client->update([
+            'points_fidelite' => max(0, $client->points_fidelite + $data['points']),
+        ]);
+
+        return response()->json($client);
+    }
 }

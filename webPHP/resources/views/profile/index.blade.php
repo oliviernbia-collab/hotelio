@@ -114,11 +114,17 @@
       <a href="{{ route('hotels.index') }}" class="btn" style="margin-top:.75rem">{{ __('Ajouter un hôtel') }}</a>
     @endforelse
   </div>
+  @endif
 
+  @if(in_array($user->role, ['prestataire', 'client']))
   <div class="card">
     <div class="card-title"><span><i class="fa-solid fa-hand-holding-dollar" style="color:var(--ci-green)"></i> {{ __('Coordonnées de paiement') }}</span></div>
     <p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem">
-      {{ __("Numéro mobile money ou RIB bancaire pour recevoir automatiquement votre part (total moins commission) après chaque réservation payée en ligne.") }}
+      @if($user->role === 'prestataire')
+        {{ __("Numéro mobile money ou RIB bancaire pour recevoir automatiquement votre part (total moins commission) après chaque réservation payée en ligne.") }}
+      @else
+        {{ __("Numéro mobile money ou RIB bancaire utilisé pour vous rembourser automatiquement si vous annulez une réservation ou une commande déjà payée.") }}
+      @endif
     </p>
 
     @if($user->hasPayoutContact())
@@ -179,7 +185,9 @@
     document.addEventListener('DOMContentLoaded', togglePayoutFields);
     </script>
   </div>
-  @elseif($user->role === 'client' && $client)
+  @endif
+
+  @if($user->role === 'client' && $client)
   <div class="card">
     <div class="card-title"><span><i class="fa-solid fa-star" style="color:#f4a423"></i> {{ __('Programme Fidélité') }}</span></div>
     <div class="meta-list">
@@ -192,5 +200,25 @@
     </div>
   </div>
   @endif
+
+  <div class="card" style="margin-top:1.25rem;border-color:rgba(230,57,70,.3)">
+    <div class="card-title"><span><i class="fa-solid fa-triangle-exclamation" style="color:#e63946"></i> {{ __('Zone dangereuse') }}</span></div>
+    <p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem">
+      {{ __("La désactivation bloque immédiatement l'accès à votre compte (vos données — réservations, factures — sont conservées). Pour une suppression définitive de vos données, contactez confidentialite@hotelio.ci.") }}
+    </p>
+    <form method="POST" action="{{ route('profile.destroy') }}" style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:flex-end"
+          onsubmit="return confirm('{{ __('Confirmer la désactivation de votre compte ?') }}')">
+      @csrf
+      @method('DELETE')
+      <div class="form-group" style="margin:0;min-width:220px">
+        <label>{{ __('Mot de passe') }}</label>
+        <input type="password" name="password" required placeholder="{{ __('Votre mot de passe actuel') }}">
+        @error('password', 'destroyAccount')<small style="color:#e63946">{{ $message }}</small>@enderror
+      </div>
+      <button type="submit" class="btn" style="background:#e63946">
+        <i class="fa-solid fa-user-slash"></i> {{ __('Désactiver mon compte') }}
+      </button>
+    </form>
+  </div>
 </div>
 @endsection

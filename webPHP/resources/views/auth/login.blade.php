@@ -231,7 +231,7 @@ h2{text-align:center;font-size:1.5rem;font-weight:600;margin-bottom:.4rem}
       ['icon'=>'fa-hotel',               'text'=> __('1 200+ hôtels disponibles')],
       ['icon'=>'fa-mobile-screen-button','text'=> 'Orange Money &amp; MTN Mobile Money'],
       ['icon'=>'fa-shield-halved',       'text'=> __('Paiement 100 % sécurisé')],
-      ['icon'=>'fa-rotate-left',         'text'=> __('Annulation flexible'), 'badge'=> __('Gratuit')],
+      ['icon'=>'fa-rotate-left',         'text'=> __('Remboursement jusqu\'à 95%')],
       ['icon'=>'fa-headset',             'text'=> __('Support 24 h / 7 j')],
       ['icon'=>'fa-location-dot',        'text'=> 'Abidjan · Yamoussoukro · Bouaké · San-Pédro'],
       ['icon'=>'fa-star',                'text'=> __('Note moyenne 4,9 / 5')],
@@ -377,5 +377,6 @@ setInterval(() => {
   slides[cur].classList.add('active');
 }, 4500);
 </script>
+@include('partials.cookie-banner')
 </body>
 </html>

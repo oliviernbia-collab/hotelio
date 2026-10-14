@@ -148,26 +148,6 @@ class BoutiqueController extends Controller
         return view('users.index', compact('users'));
     }
 
-    public function storeUser(Request $request)
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email',
-            'role' => 'required|string|max:80',
-        ]);
-
-        User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => bcrypt('password123'),
-            'role' => $data['role'],
-            'status' => 'actif',
-            'hotels' => 'Toutes les propriétés',
-        ]);
-
-        return redirect()->route('users.index')->with('success', 'Utilisateur ajouté.');
-    }
-
     /* ===================== HOTELS ===================== */
 
     public function editHotel($id)

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DashboardController;
 use App\Models\Client;
 use App\Models\Reservation;
+use App\Services\RefundService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -93,6 +95,10 @@ class ReservationController extends Controller
             'status' => 'required|in:en_attente,confirmée,annulée,terminée',
         ]);
 
+        if ($request->status === 'annulée' && $reservation->status !== 'annulée' && $reservation->paid) {
+            RefundService::reverseCommissionAndStats($reservation);
+        }
+
         $reservation->update(['status' => $request->status]);
 
         if ($request->status === 'annulée') {
@@ -100,6 +106,29 @@ class ReservationController extends Controller
         }
 
         return response()->json($reservation);
+    }
+
+    /** Annulation par le client avec remboursement réel (voir RefundService). */
+    public function cancel(Request $request, Reservation $reservation)
+    {
+        $this->gate($request, $reservation);
+
+        $result = RefundService::cancelReservation($reservation);
+
+        if (! $result['ok']) {
+            return response()->json(['error' => $result['error'], 'message' => $result['message']], 422);
+        }
+
+        $reservation->room?->update(['status' => 'disponible']);
+
+        return response()->json([
+            'reservation' => $reservation->fresh(),
+            'refund' => [
+                'fee' => $result['fee'] ?? null,
+                'amount' => $result['refundAmount'] ?? null,
+                'status' => $result['refundStatus'] ?? null,
+            ],
+        ]);
     }
 
     public function checkIn(Request $request, Reservation $reservation)
@@ -111,6 +140,11 @@ class ReservationController extends Controller
             'checkin_at' => now(),
         ]);
         $reservation->room?->update(['status' => 'occupée']);
+
+        // Le séjour commence : plus de risque d'annulation, on peut reverser le prestataire.
+        if ($reservation->paid) {
+            app(DashboardController::class)->triggerOwnerPayout($reservation->fresh());
+        }
 
         return response()->json($reservation);
     }

@@ -153,7 +153,7 @@ h2{text-align:center;font-size:1.4rem;font-weight:600;margin-bottom:.4rem}
       ['icon'=>'fa-hotel',               'text'=> '1 200+ hôtels disponibles'],
       ['icon'=>'fa-mobile-screen-button','text'=> 'Orange Money &amp; MTN Mobile Money'],
       ['icon'=>'fa-shield-halved',       'text'=> 'Paiement 100 % sécurisé'],
-      ['icon'=>'fa-rotate-left',         'text'=> 'Annulation flexible'],
+      ['icon'=>'fa-rotate-left',         'text'=> 'Remboursement jusqu\'à 95%'],
       ['icon'=>'fa-headset',             'text'=> 'Support 24 h / 7 j'],
       ['icon'=>'fa-lock',                'text'=> 'Récupération sécurisée'],
       ['icon'=>'fa-star',                'text'=> 'Note moyenne 4,9 / 5'],

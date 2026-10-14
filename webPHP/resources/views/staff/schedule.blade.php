@@ -99,7 +99,7 @@ $nextYear = $week < 52 ? $year : $year + 1;
                     <td style="padding:.75rem 1.1rem;vertical-align:middle;">
                         <div style="display:flex;align-items:center;gap:.65rem;">
                             @if($member->photo)
-                                <img src="{{ $member->photo_url }}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--ci-orange-border);">
+                                <img src="{{ $member->photo_url }}" alt="{{ $member->first_name }} {{ $member->last_name }}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2px solid var(--ci-orange-border);">
                             @else
                                 <div style="width:34px;height:34px;border-radius:50%;background:var(--ci-orange-dim);border:2px solid var(--ci-orange-border);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.78rem;color:var(--ci-orange);flex-shrink:0;">
                                     {{ strtoupper(substr($member->first_name,0,1)) }}{{ strtoupper(substr($member->last_name,0,1)) }}

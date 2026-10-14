@@ -531,10 +531,12 @@ class DashboardController extends Controller
                 'name'        => $data['first_name'] . ' ' . $data['last_name'],
                 'email'       => $request->account_email,
                 'password'    => bcrypt($request->account_pass ?: 'password123'),
+            ]);
+            $user->forceFill([
                 'role'        => 'employe',
                 'status'      => 'actif',
                 'permissions' => $request->input('permissions', []),
-            ]);
+            ])->save();
             $data['user_id'] = $user->id;
         }
 
@@ -542,7 +544,7 @@ class DashboardController extends Controller
 
         // Lier le staff_id sur le user si créé
         if (isset($user)) {
-            $user->update(['staff_id' => $staff->id]);
+            $user->forceFill(['staff_id' => $staff->id])->save();
         }
 
         return redirect()->route('staff.index')->with('success', 'Personnel ajouté' . (isset($user) ? ' avec compte de connexion.' : '.'));
@@ -578,9 +580,9 @@ class DashboardController extends Controller
 
         if ($staff->user_id && $staff->user) {
             // Mettre à jour les permissions du compte existant
-            $staff->user->update([
+            $staff->user->forceFill([
                 'permissions' => $request->input('permissions', []),
-            ]);
+            ])->save();
         } elseif ($request->boolean('create_account') && $request->filled('account_email')) {
             // Créer un compte depuis la modale de modification
             $request->validate(['account_email' => 'email|max:255|unique:users,email']);
@@ -588,11 +590,13 @@ class DashboardController extends Controller
                 'name'        => $staff->first_name . ' ' . $staff->last_name,
                 'email'       => $request->account_email,
                 'password'    => bcrypt($request->account_pass ?: 'password123'),
+            ]);
+            $user->forceFill([
                 'role'        => 'employe',
                 'status'      => 'actif',
                 'permissions' => $request->input('permissions', []),
                 'staff_id'    => $staff->id,
-            ]);
+            ])->save();
             $staff->update(['user_id' => $user->id]);
         }
 
@@ -1003,6 +1007,27 @@ class DashboardController extends Controller
     {
         $period = $request->get('period', 'month'); // day | week | month | year | all
 
+        // Export CSV demandé ?
+        if ($request->get('export') === 'excel') {
+            $dateFrom = match($period) {
+                'day'   => now()->startOfDay(),
+                'week'  => now()->startOfWeek(),
+                'month' => now()->startOfMonth(),
+                'year'  => now()->startOfYear(),
+                default => null,
+            };
+            return $this->exportReservationsExcel($period, $dateFrom);
+        }
+
+        return view('reports.index', $this->reportsStats($period));
+    }
+
+    /**
+     * Statistiques de réservations sur une période. Extrait de reports() (hors export CSV,
+     * propre au web) pour être réutilisé par Api\ReportController::index() (miroir mobile).
+     */
+    public function reportsStats(string $period): array
+    {
         $query = Reservation::query();
 
         $dateFrom = match($period) {
@@ -1041,15 +1066,10 @@ class DashboardController extends Controller
         $hotels    = Hotel::orderByDesc('revenue')->take(6)->get();
         $avgRating = Hotel::avg('rating');
 
-        // Export CSV demandé ?
-        if ($request->get('export') === 'excel') {
-            return $this->exportReservationsExcel($period, $dateFrom);
-        }
-
-        return view('reports.index', compact(
+        return compact(
             'hotels', 'totalRevenue', 'totalCommissions', 'totalReservations', 'avgRating',
             'confirmedCount', 'cancelledCount', 'byNationality', 'byRoomType', 'period'
-        ));
+        );
     }
 
     private function exportReservationsExcel(string $period, ?\Carbon\Carbon $dateFrom)
@@ -1128,7 +1148,29 @@ class DashboardController extends Controller
     {
         $type = in_array($request->get('type'), ['reservations', 'achats'], true) ? $request->get('type') : 'tous';
 
-        $prestataires = \App\Models\User::where('role', 'prestataire')
+        $prestataires  = $this->payoutsData($type);
+        $failedPayouts = Reservation::with(['hotel', 'client'])
+            ->where('payout_status', 'error')
+            ->latest()
+            ->get();
+
+        $failedLignes = \App\Models\LigneCommande::with(['commande', 'product.user'])
+            ->where('payout_status', 'error')
+            ->latest()
+            ->get();
+
+        return view('admin.payouts.index', compact('prestataires', 'failedPayouts', 'failedLignes', 'type'));
+    }
+
+    /**
+     * Solde des reversements par prestataire. Extrait de payouts() pour être réutilisé par
+     * Api\PayoutController::index() (miroir mobile de cette même page admin).
+     */
+    public function payoutsData(?string $type): \Illuminate\Support\Collection
+    {
+        $type = in_array($type, ['reservations', 'achats'], true) ? $type : 'tous';
+
+        return \App\Models\User::where('role', 'prestataire')
             ->get()
             ->map(function ($user) use ($type) {
                 $owedReservations = $user->totalOwedFromReservations();
@@ -1149,18 +1191,6 @@ class DashboardController extends Controller
             })
             ->sortByDesc('balance')
             ->values();
-
-        $failedPayouts = Reservation::with(['hotel', 'client'])
-            ->where('payout_status', 'error')
-            ->latest()
-            ->get();
-
-        $failedLignes = \App\Models\LigneCommande::with(['commande', 'product.user'])
-            ->where('payout_status', 'error')
-            ->latest()
-            ->get();
-
-        return view('admin.payouts.index', compact('prestataires', 'failedPayouts', 'failedLignes', 'type'));
     }
 
     /** Relance un virement automatique Jèko qui a échoué (contact invalide, solde insuffisant...). */
@@ -1216,8 +1246,12 @@ class DashboardController extends Controller
         return back()->with('success', 'Paiement enregistré, abonnement actif jusqu\'au ' . $subscription->fresh()->current_period_end->format('d/m/Y') . '.');
     }
 
-    /** Prolonge l'abonnement d'un mois et journalise le paiement — manuel (admin) ou automatique (webhook Jèko). */
-    private function extendSubscriptionPeriod(\App\Models\Subscription $subscription, int $amount, ?string $paymentMethod, ?int $recordedBy): void
+    /**
+     * Prolonge l'abonnement d'un mois et journalise le paiement — manuel (admin) ou automatique
+     * (webhook Jèko). Public : réutilisée par Api\SubscriptionController::adminRecordPayment()
+     * (miroir mobile de ce même formulaire admin).
+     */
+    public function extendSubscriptionPeriod(\App\Models\Subscription $subscription, int $amount, ?string $paymentMethod, ?int $recordedBy): void
     {
         $periodStart = ($subscription->current_period_end && $subscription->current_period_end->isFuture())
             ? $subscription->current_period_end
@@ -1622,6 +1656,11 @@ class DashboardController extends Controller
             ->where('number', $reservation->room)
             ->update(['status' => Room::STATUS_OCCUPEE]);
 
+        // Le séjour commence : plus de risque d'annulation, on peut reverser le prestataire.
+        if ($reservation->paid) {
+            $this->triggerOwnerPayout($reservation->fresh());
+        }
+
         return back()->with('success', 'Check-in effectué. Chambre marquée Occupée.');
     }
 
@@ -1834,9 +1873,11 @@ class DashboardController extends Controller
     /**
      * Reverse automatiquement la part du propriétaire (total − commission) vers son contact
      * Jèko (mobile money / banque), uniquement quand l'argent est réellement passé par le
-     * compte Jèko de la plateforme (réservation commissionnable). Appelé depuis le webhook
-     * Jèko après confirmation du paiement — jamais depuis le paiement Espèces/Virement
-     * (l'hôtel a déjà l'argent en main dans ce cas, rien à reverser).
+     * compte Jèko de la plateforme (réservation commissionnable). Déclenché au check-in réel
+     * (le séjour commence, plus de risque d'annulation) et, en filet de sécurité, par la
+     * commande planifiée `payouts:release-due` une fois la date de check-in dépassée — jamais
+     * à la confirmation du paiement ni pour un paiement Espèces/Virement (l'hôtel a déjà
+     * l'argent en main dans ce cas, rien à reverser).
      */
     public function triggerOwnerPayout(Reservation $reservation): void
     {
@@ -1892,7 +1933,7 @@ class DashboardController extends Controller
         ]);
 
         if ($request->status === 'annulée' && $reservation->status !== 'annulée' && $reservation->paid) {
-            $this->reverseCommissionAndStats($reservation);
+            \App\Services\RefundService::reverseCommissionAndStats($reservation);
         }
 
         $reservation->update(['status' => $request->status]);
@@ -1909,27 +1950,19 @@ class DashboardController extends Controller
     }
 
     /**
-     * Annule les effets comptables de markReservationPaid() quand une réservation payée est
-     * annulée : la commission déjà calculée est remise à zéro et les statistiques (hôtel, client)
-     * sont décrémentées. Le paiement lui-même (`paid`) n'est pas touché — un éventuel remboursement
-     * reste géré manuellement par l'hôtel.
+     * Annulation côté client avec remboursement réel (voir RefundService) : 95% du montant
+     * payé est viré au client, 1% au prestataire, 4% reste sur le compte Jèko de la plateforme.
      */
-    private function reverseCommissionAndStats(Reservation $reservation): void
+    public function cancelReservation(Reservation $reservation)
     {
-        $reservation->hotel?->decrement('revenue', min($reservation->total, $reservation->hotel->revenue));
-        if ($reservation->hotel && $reservation->hotel->checkins > 0) {
-            $reservation->hotel->decrement('checkins');
+        $client = Client::where('user_id', Auth::id())->orWhere('email', Auth::user()->email)->first();
+        if (! $client || $reservation->client_id !== $client->id) {
+            abort(403);
         }
 
-        $client = $reservation->client;
-        if ($client) {
-            $client->decrement('total_spend', min($reservation->total, $client->total_spend));
-            if ($client->total_stays > 0) {
-                $client->decrement('total_stays');
-            }
-        }
+        $result = \App\Services\RefundService::cancelReservation($reservation);
 
-        $reservation->update(['commission_rate' => null, 'commission_amount' => null]);
+        return back()->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
 
     private function isRoomBooked(int $hotelId, string $roomNumber, Carbon $checkin, Carbon $checkout): bool
@@ -2067,17 +2100,19 @@ class DashboardController extends Controller
         $data = $request->validate([
             'name'  => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email',
-            'role'  => 'required|string|max:80',
+            'role'  => 'required|string|in:admin,prestataire,employe,client',
         ]);
 
-        User::create([
+        $user = User::create([
             'name'     => $data['name'],
             'email'    => $data['email'],
             'password' => bcrypt('password123'),
-            'role'     => $data['role'],
-            'status'   => 'actif',
             'hotels'   => 'Toutes les propriétés',
         ]);
+        $user->forceFill([
+            'role'   => $data['role'],
+            'status' => 'actif',
+        ])->save();
 
         return redirect()->route('users.index')->with('success', 'Utilisateur ajouté.');
     }
@@ -2096,7 +2131,8 @@ class DashboardController extends Controller
             $data['password'] = bcrypt($request->password);
         }
 
-        $user->update($data);
+        $user->update(\Arr::except($data, ['role', 'status']));
+        $user->forceFill(\Arr::only($data, ['role', 'status']))->save();
 
         return redirect()->route('users.index')->with('success', 'Utilisateur mis à jour.');
     }

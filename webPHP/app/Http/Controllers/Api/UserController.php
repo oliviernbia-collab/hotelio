@@ -35,10 +35,17 @@ class UserController extends Controller
             'status'   => 'sometimes|in:actif,inactif',
         ]);
 
-        $data['password'] = Hash::make($data['password']);
-        $data['status']   = $data['status'] ?? 'actif';
+        $user = User::create([
+            'name'     => $data['name'],
+            'email'    => $data['email'],
+            'password' => Hash::make($data['password']),
+        ]);
+        $user->forceFill([
+            'role'   => $data['role'],
+            'status' => $data['status'] ?? 'actif',
+        ])->save();
 
-        return response()->json(User::create($data), 201);
+        return response()->json($user, 201);
     }
 
     public function update(Request $request, User $user)
@@ -56,7 +63,8 @@ class UserController extends Controller
             $data['password'] = Hash::make($request->password);
         }
 
-        $user->update($data);
+        $user->update(\Arr::except($data, ['role', 'status', 'permissions']));
+        $user->forceFill(\Arr::only($data, ['role', 'status', 'permissions']))->save();
 
         return response()->json($user->fresh());
     }
