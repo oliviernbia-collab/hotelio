@@ -59,7 +59,7 @@ if (-not $SansVendor) {
 Write-Host '==> Création de l''archive'
 # tar (bsdtar de Windows) écrit des chemins avec "/" : l'archive se dézippe correctement sous Linux,
 # contrairement à Compress-Archive de PowerShell 5.1.
-tar -a -c -f $archive -C $staging .
+& "$env:SystemRoot\System32\tar.exe" -a -c -f $archive -C $staging .
 if ($LASTEXITCODE -ne 0) { throw 'La création du zip a échoué' }
 
 Remove-Item $staging -Recurse -Force
