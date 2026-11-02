@@ -1,0 +1,6 @@
+# Déploiement cPanel (Git Version Control) du site web : voir webPHP/deploy/cpanel-deploy.sh.
+# Lancé automatiquement par .github/workflows/deploy-web.yml après chaque push sur main.
+---
+deployment:
+  tasks:
+    - /bin/bash webPHP/deploy/cpanel-deploy.sh

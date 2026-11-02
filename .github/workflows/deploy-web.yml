@@ -1,0 +1,45 @@
+# Déploiement continu du site web (webPHP) sur l'hébergement LWS (cPanel).
+# À chaque push sur main qui touche webPHP/ : cPanel récupère le dépôt (Git Version Control),
+# puis exécute .cpanel.yml → webPHP/deploy/cpanel-deploy.sh (copie, Composer, migrations, caches).
+# Tout passe par l'API cPanel en HTTPS : aucun accès SSH n'est nécessaire.
+#
+# Secrets du dépôt (Settings → Secrets and variables → Actions) :
+#   CPANEL_HOST       hôte cPanel, sans https:// (hotelio-ci.site)
+#   CPANEL_USER       utilisateur cPanel (c2885610c)
+#   CPANEL_API_TOKEN  jeton créé dans cPanel → Gérer les jetons d'API
+name: Déploiement web (LWS)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'webPHP/**'
+      - '.cpanel.yml'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+env:
+  REPO_NAME: hotelio   # copie du dépôt dans cPanel : ~/repositories/hotelio
+  SITE_URL: https://hotelio-ci.site
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Déploiement via cPanel
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_API_TOKEN: ${{ secrets.CPANEL_API_TOKEN }}
+        run: bash .github/scripts/cpanel-deploy.sh "/home/$CPANEL_USER/repositories/$REPO_NAME" main
+
+      - name: Vérification du site
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -L "$SITE_URL")
+          echo "HTTP $code"
+          test "$code" -lt 400
