@@ -30,6 +30,9 @@ class SecurityHeaders
             . "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
             . "img-src 'self' data: https:; "
             . "connect-src 'self' https:; "
+            // Cartes de localisation des hôtels (iframe Google Maps) : sans frame-src, la
+            // directive retombe sur default-src 'self' et le navigateur bloque la carte.
+            . "frame-src 'self' https://maps.google.com https://www.google.com; "
             . "frame-ancestors 'none';"
         );
 

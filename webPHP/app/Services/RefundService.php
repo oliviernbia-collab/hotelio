@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Commande;
 use App\Models\LigneCommande;
 use App\Models\Reservation;
+use App\Models\Room;
 use App\Notifications\ReservationCancelledNotification;
 use Illuminate\Support\Facades\Log;
 
@@ -62,7 +63,27 @@ class RefundService
     /**
      * @return array{ok: bool, error: ?string, message: string, fee?: int, refundAmount?: int, refundStatus?: ?string}
      */
-    public static function cancelReservation(Reservation $reservation): array
+    /**
+     * $byHotel : annulation décidée par l'hôtel ou un admin → remboursement intégral (100 %),
+     * sans frais ni indemnité prestataire, et sans délai minimum avant l'arrivée.
+     */
+    public static function cancelReservation(Reservation $reservation, bool $byHotel = false): array
+    {
+        $result = self::cancelReservationAndRefund($reservation, $byHotel);
+
+        // Chambre libérée dès que l'annulation aboutit (elle restait « réservée »), sauf si
+        // le client est déjà dans la chambre.
+        if ($result['ok']) {
+            Room::where('hotel_id', $reservation->hotel_id)
+                ->where('number', $reservation->room)
+                ->where('status', Room::STATUS_RESERVEE)
+                ->update(['status' => Room::STATUS_LIBRE]);
+        }
+
+        return $result;
+    }
+
+    private static function cancelReservationAndRefund(Reservation $reservation, bool $byHotel): array
     {
         if (! $reservation->paid) {
             if ($reservation->checkin_at) {
@@ -74,7 +95,10 @@ class RefundService
             return ['ok' => true, 'error' => null, 'message' => 'Réservation annulée.'];
         }
 
-        if (! self::canCancelReservation($reservation)) {
+        if ($reservation->checkin_at) {
+            return ['ok' => false, 'error' => 'too_late', 'message' => 'Cette réservation ne peut plus être annulée (séjour déjà commencé).'];
+        }
+        if (! $byHotel && ! self::canCancelReservation($reservation)) {
             return ['ok' => false, 'error' => 'too_late', 'message' => "Cette réservation ne peut plus être annulée (séjour commencé ou trop proche)."];
         }
 
@@ -92,11 +116,15 @@ class RefundService
             return [
                 'ok' => false,
                 'error' => 'missing_payout_contact',
-                'message' => "Enregistrez d'abord vos coordonnées de paiement (mobile money ou compte bancaire) pour recevoir votre remboursement.",
+                'message' => $byHotel
+                    ? "Le client n'a pas encore enregistré ses coordonnées de paiement : le remboursement est impossible pour l'instant. Demandez-lui de les ajouter dans son profil, puis réessayez."
+                    : "Enregistrez d'abord vos coordonnées de paiement (mobile money ou compte bancaire) pour recevoir votre remboursement.",
             ];
         }
 
-        ['fee' => $fee, 'adminAmount' => $adminAmount, 'providerAmount' => $providerAmount, 'refundAmount' => $refundAmount] = self::splitAmounts($reservation->total);
+        ['fee' => $fee, 'adminAmount' => $adminAmount, 'providerAmount' => $providerAmount, 'refundAmount' => $refundAmount] = $byHotel
+            ? ['fee' => 0, 'adminAmount' => 0, 'providerAmount' => 0, 'refundAmount' => (int) $reservation->total]
+            : self::splitAmounts($reservation->total);
 
         $refundResult = PayoutService::transfer(
             $clientUser,
@@ -115,7 +143,7 @@ class RefundService
                 'payout_transfer_id' => $reservation->payout_transfer_id,
                 'provider_share_due' => $providerAmount,
             ]);
-        } elseif ($owner) {
+        } elseif ($owner && $providerAmount > 0) {
             $ownerResult = PayoutService::transfer(
                 $owner,
                 $providerAmount,

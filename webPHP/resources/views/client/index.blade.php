@@ -57,7 +57,7 @@
     </div>
     <div class="dss-stats">
       <div class="dss-stat">
-        <div class="dss-stat-val"><span data-count="{{ $clientReservations->count() }}">0</span></div>
+        <div class="dss-stat-val"><span data-count="{{ $reservationsCount }}">0</span></div>
         <div class="dss-stat-lbl">{{ __('Réservations') }}</div>
       </div>
       <div class="dss-stat">
@@ -89,7 +89,7 @@
 <div class="stat-grid">
   <div class="stat-box card-hover" style="border-left:3px solid var(--ci-orange)">
     <div class="lbl">{{ __('Mes Réservations') }}</div>
-    <div class="val"><span data-count="{{ $clientReservations->count() }}">0</span></div>
+    <div class="val"><span data-count="{{ $reservationsCount }}">0</span></div>
     <div class="sub">{{ __('Séjours réservés') }}</div>
   </div>
   <div class="stat-box card-hover" style="border-left:3px solid var(--ci-green)">
@@ -97,7 +97,7 @@
     <div class="val"><span data-count="{{ $loyaltyPoints }}">0</span></div>
     <div class="sub">
       <div class="loyalty-bar">
-        <div class="loyalty-fill" style="width:{{ min(100, $loyaltyPoints / 100) }}%"></div>
+        <div class="loyalty-fill" style="width:{{ min(100, $loyaltyPoints / 50) }}%"></div>
       </div>
     </div>
   </div>

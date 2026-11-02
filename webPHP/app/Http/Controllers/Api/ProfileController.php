@@ -59,7 +59,7 @@ class ProfileController extends Controller
                 'accountNumber' => $data['account_number'],
                 'key'           => $data['rib_key'],
             ]
-            : ['number' => $data['phone_number']];
+            : ['number' => JekoClient::toInternationalNumber($data['phone_number'])];
 
         $result = JekoClient::createContact([
             'name'          => $user->name,
@@ -79,9 +79,7 @@ class ProfileController extends Controller
             'jeko_contact_id'   => $result['id'],
         ]);
 
-        if ($oldContactId) {
-            try { JekoClient::deleteContact($oldContactId); } catch (\Throwable) {}
-        }
+        JekoClient::deleteContactIfUnused($oldContactId, $result['id']);
 
         return response()->json(['message' => 'Coordonnées de paiement enregistrées.', 'user' => $user->fresh()]);
     }

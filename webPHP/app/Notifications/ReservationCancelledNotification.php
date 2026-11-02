@@ -32,7 +32,10 @@ class ReservationCancelledNotification extends Notification
             ->line("Votre réservation **{$res->code}** pour l'hôtel **{$res->hotel->name}** a été annulée.");
 
         if ($this->refundAmount !== null) {
-            $message->line("Frais d'annulation : " . number_format($this->cancellationFee ?? 0, 0, ',', ' ') . ' FCFA (5% du montant payé).')
+            // Frais nuls : annulation par l'hôtel, remboursement intégral
+            $message->line($this->cancellationFee
+                    ? "Frais d'annulation : " . number_format($this->cancellationFee, 0, ',', ' ') . ' FCFA (5% du montant payé).'
+                    : "Annulation à l'initiative de l'hôtel : aucun frais, remboursement intégral.")
                 ->line('Montant remboursé : **' . number_format($this->refundAmount, 0, ',', ' ') . ' FCFA**, viré sur vos coordonnées de paiement enregistrées.');
         } else {
             $message->line("Si vous n'êtes pas à l'origine de cette annulation, contactez-nous immédiatement.");

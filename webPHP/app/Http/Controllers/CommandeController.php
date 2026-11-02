@@ -338,12 +338,15 @@ class CommandeController extends Controller
 
     public function commandes()
     {
-        $commandes = Commande::latest()->get();
+        // Les paniers en cours ('en_attente') ne sont pas des commandes, et le total des ventes ne
+        // compte que les commandes réglées (même calcul que /api/admin/orders du backend mobile).
+        $paidStatuses = ['payé', 'payée', 'confirmée', 'livrée'];
+        $commandes = Commande::where('statut', '<>', 'en_attente')->latest()->get();
 
-        $total = Commande::sum('total');
-        $nb = Commande::count();
+        $total = $commandes->whereIn('statut', $paidStatuses)->sum('total');
+        $nb = $commandes->count();
 
-        return view('admin.commandes', compact('commandes', 'total', 'nb'));
+        return view('admin.commandes', compact('commandes', 'total', 'nb', 'paidStatuses'));
     }
 
     /**

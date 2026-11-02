@@ -92,18 +92,23 @@ class ReservationController extends Controller
         $this->gate($request, $reservation);
 
         $request->validate([
-            'status' => 'required|in:en_attente,confirmée,annulée,terminée',
+            // Mêmes statuts que la version web (DashboardController::updateReservationStatus)
+            'status' => 'required|in:en_attente,confirmée,annulée,arrivée,départie',
         ]);
 
-        if ($request->status === 'annulée' && $reservation->status !== 'annulée' && $reservation->paid) {
-            RefundService::reverseCommissionAndStats($reservation);
+        // Annulation : même traitement que la version web et le backend mobile (remboursement
+        // Jèko si payée, chambre libérée par RefundService).
+        if ($request->status === 'annulée' && $reservation->status !== 'annulée') {
+            // Annulée par l'hôtel ou un admin : remboursement intégral (comme le backend mobile)
+            $result = RefundService::cancelReservation($reservation, byHotel: $request->user()->role !== 'client');
+            if (! $result['ok']) {
+                return response()->json(['error' => $result['error'], 'message' => $result['message']], 422);
+            }
+
+            return response()->json($reservation->fresh());
         }
 
         $reservation->update(['status' => $request->status]);
-
-        if ($request->status === 'annulée') {
-            $reservation->room?->update(['status' => 'disponible']);
-        }
 
         return response()->json($reservation);
     }
@@ -113,7 +118,7 @@ class ReservationController extends Controller
     {
         $this->gate($request, $reservation);
 
-        $result = RefundService::cancelReservation($reservation);
+        $result = RefundService::cancelReservation($reservation, byHotel: $request->user()->role !== 'client');
 
         if (! $result['ok']) {
             return response()->json(['error' => $result['error'], 'message' => $result['message']], 422);
@@ -135,8 +140,13 @@ class ReservationController extends Controller
     {
         $this->gate($request, $reservation);
 
+        if ($reservation->checkin_at) {
+            return response()->json(['message' => 'Le check-in a déjà été effectué.'], 422);
+        }
+
+        // Même statut que la version web (DashboardController::checkIn) et le backend mobile
         $reservation->update([
-            'status'     => 'confirmée',
+            'status'     => 'arrivée',
             'checkin_at' => now(),
         ]);
         $reservation->room?->update(['status' => 'occupée']);
@@ -153,19 +163,27 @@ class ReservationController extends Controller
     {
         $this->gate($request, $reservation);
 
+        if ($reservation->checkout_at) {
+            return response()->json(['message' => 'Le check-out a déjà été effectué.'], 422);
+        }
+        if (! $reservation->checkin_at) {
+            return response()->json(['message' => "Le check-in n'a pas encore été effectué."], 422);
+        }
+
+        // Même règle que la version web (DashboardController::checkOut) et le backend mobile
         $reservation->update([
-            'status'      => 'terminée',
+            'status'      => 'départie',
             'checkout_at' => now(),
         ]);
         $reservation->room?->update(['status' => 'en_nettoyage']);
 
-        // Mettre à jour les stats client
+        // Points fidélité (10 pts par nuit). Séjours et dépenses déjà comptés au paiement.
         $client = $reservation->client;
         if ($client) {
-            $client->increment('total_stays');
-            $client->increment('total_spend', $reservation->total);
+            $client->increment('points_fidelite', $reservation->nights * 10);
             $client->update(['last_visit' => now()->toDateString()]);
         }
+        $reservation->hotel?->increment('checkouts');
 
         return response()->json($reservation);
     }

@@ -178,15 +178,21 @@ class DashboardController extends Controller
                 ->latest()->limit(5)->get()
             : collect();
 
+        // Mêmes chiffres que l'écran d'accueil mobile (backendMobile dashboardController) :
+        // - réservations : toutes (la liste ci-dessus est limitée aux 5 dernières) ;
+        // - dépenses : réservations payées et non annulées (une annulation est remboursée) ;
+        // - points : points_fidelite, crédités au check-out et ajustables par l'hôtel.
+        $reservationsCount = $client ? Reservation::where('client_id', $client->id)->count() : 0;
+
         $totalSpend = $client
-            ? Reservation::where('client_id', $client->id)->where('paid', true)->sum('total')
+            ? Reservation::where('client_id', $client->id)->where('paid', true)->where('status', '<>', 'annulée')->sum('total')
             : 0;
 
-        $loyaltyPoints = (int) ($totalSpend / 1000);
+        $loyaltyPoints = (int) ($client->points_fidelite ?? 0);
 
         $favoriteIds = $user->favoriteHotels()->pluck('hotel_id');
 
-        return view('client.index', compact('hotels', 'clientReservations', 'client', 'totalSpend', 'loyaltyPoints', 'favoriteIds'));
+        return view('client.index', compact('hotels', 'clientReservations', 'client', 'totalSpend', 'loyaltyPoints', 'favoriteIds', 'reservationsCount'));
     }
 
     public function hotels(Request $request)
@@ -1421,7 +1427,7 @@ class DashboardController extends Controller
                 'accountNumber' => $data['account_number'],
                 'key'           => $data['rib_key'],
             ]
-            : ['number' => $data['phone_number']];
+            : ['number' => JekoClient::toInternationalNumber($data['phone_number'])];
 
         $result = JekoClient::createContact([
             'name'          => $user->name,
@@ -1441,9 +1447,7 @@ class DashboardController extends Controller
             'jeko_contact_id'   => $result['id'],
         ]);
 
-        if ($oldContactId) {
-            try { JekoClient::deleteContact($oldContactId); } catch (\Throwable) {}
-        }
+        JekoClient::deleteContactIfUnused($oldContactId, $result['id']);
 
         return back()->with('success', 'Coordonnées de paiement enregistrées.');
     }
@@ -1683,15 +1687,14 @@ class DashboardController extends Controller
             ->where('number', $reservation->room)
             ->update(['status' => Room::STATUS_NETTOYAGE]);
 
-        // Mise à jour stats client + points fidélité (10 pts par nuit)
+        // Points fidélité (10 pts par nuit). Séjours et dépenses du client sont déjà comptés au
+        // paiement (markReservationPaid) : ne pas les recompter ici.
         $client = $reservation->client;
         if ($client) {
-            $pointsGagnes = $reservation->nights * 10;
-            $client->increment('total_stays');
-            $client->increment('total_spend', $reservation->total);
-            $client->increment('points_fidelite', $pointsGagnes);
+            $client->increment('points_fidelite', $reservation->nights * 10);
             $client->update(['last_visit' => now()]);
         }
+        $reservation->hotel?->increment('checkouts');
 
         return back()->with('success', 'Check-out effectué. Chambre en nettoyage. Points fidélité crédités.');
     }
@@ -1932,19 +1935,29 @@ class DashboardController extends Controller
             'status' => 'required|string|in:confirmée,annulée,en_attente,arrivée,départie',
         ]);
 
-        if ($request->status === 'annulée' && $reservation->status !== 'annulée' && $reservation->paid) {
-            \App\Services\RefundService::reverseCommissionAndStats($reservation);
+        // Annulation par l'hôtel : même traitement que l'annulation côté client et que le backend
+        // mobile — une réservation payée via Jèko est remboursée au client (avant, seules la
+        // commission et les stats étaient annulées : le client payait sans être remboursé).
+        if ($request->status === 'annulée' && $reservation->status !== 'annulée') {
+            // Écran réservé à l'hôtel (authorizeHotel) : remboursement intégral, sans frais
+            $result = \App\Services\RefundService::cancelReservation($reservation, byHotel: true);
+            if (! $result['ok']) {
+                return redirect()->back()->with('error', $result['message']);
+            }
+
+            // Le remboursement Jèko notifie déjà le client ; sinon on le prévient ici.
+            if (! isset($result['refundAmount'])) {
+                $clientUser = $reservation->client?->user
+                    ?? User::where('email', optional($reservation->client)->email)->first();
+                if ($clientUser) {
+                    try { $clientUser->notify(new ReservationCancelledNotification($reservation->fresh())); } catch (\Throwable) {}
+                }
+            }
+
+            return redirect()->back()->with('success', $result['message']);
         }
 
         $reservation->update(['status' => $request->status]);
-
-        // Notifier le client si annulation
-        if ($request->status === 'annulée') {
-            $clientUser = User::where('email', optional($reservation->client)->email)->first();
-            if ($clientUser) {
-                try { $clientUser->notify(new ReservationCancelledNotification($reservation)); } catch (\Throwable) {}
-            }
-        }
 
         return redirect()->back()->with('success', 'Statut de la réservation mis à jour.');
     }

@@ -39,7 +39,7 @@
         <div style="width:52px;height:52px;border-radius:14px;background:rgba(247,127,0,.12);border:1px solid rgba(247,127,0,.25);display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;font-size:1.2rem;color:#fbbf24;">
             <i class="fa-solid fa-clock"></i>
         </div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--text-primary);">{{ $commandes->where('statut', 'en attente')->count() }}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--text-primary);">{{ $commandes->where('statut', 'en_cours')->count() }}</div>
         <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">{{ __('En attente') }}</div>
     </div>
 
@@ -47,7 +47,7 @@
         <div style="width:52px;height:52px;border-radius:14px;background:rgba(0,154,68,.12);border:1px solid rgba(0,154,68,.25);display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;font-size:1.2rem;color:var(--ci-green);">
             <i class="fa-solid fa-circle-check"></i>
         </div>
-        <div style="font-size:1.6rem;font-weight:800;color:var(--text-primary);">{{ $commandes->where('statut', 'payée')->count() }}</div>
+        <div style="font-size:1.6rem;font-weight:800;color:var(--text-primary);">{{ $commandes->whereIn('statut', $paidStatuses)->count() }}</div>
         <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">{{ __('Payées') }}</div>
     </div>
 </div>
@@ -78,9 +78,9 @@
             <div style="font-weight:800;font-size:1.05rem;color:var(--ci-green);">
                 {{ number_format($c->total, 0, ',', ' ') }} FCFA
             </div>
-            @if($c->statut === 'payée')
+            @if(in_array($c->statut, $paidStatuses, true))
                 <span class="badge badge-success"><i class="fa-solid fa-check"></i> {{ __('Payée') }}</span>
-            @elseif($c->statut === 'en attente')
+            @elseif($c->statut === 'en_cours') {{-- paiement Jèko lancé, pas encore confirmé --}}
                 <span class="badge badge-warning"><i class="fa-solid fa-clock"></i> {{ __('En attente') }}</span>
             @else
                 <span class="badge badge-danger"><i class="fa-solid fa-xmark"></i> {{ __('Annulée') }}</span>

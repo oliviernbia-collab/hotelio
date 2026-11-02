@@ -63,6 +63,36 @@ class JekoClient
         return $response->json() ?? [];
     }
 
+    /**
+     * Jèko attend les numéros mobile money au format international (+225XXXXXXXXXX).
+     * Un numéro ivoirien saisi localement (10 chiffres) reçoit l'indicatif +225.
+     */
+    public static function toInternationalNumber(string $phone): string
+    {
+        $p = preg_replace('/[\s.\-()]/', '', $phone);
+        if (str_starts_with($p, '+')) return $p;
+        if (str_starts_with($p, '00')) return '+' . substr($p, 2);
+        if (preg_match('/^225\d{10}$/', $p)) return '+' . $p;
+        if (preg_match('/^\d{10}$/', $p)) return '+225' . $p;
+        return $p;
+    }
+
+    /**
+     * Supprime l'ancien contact d'un utilisateur après en avoir enregistré un nouveau — sauf si
+     * Jèko a renvoyé ce même contact (bénéficiaire déjà connu) ou s'il sert encore à un autre
+     * compte (même numéro) : le supprimer ferait échouer les virements vers ce contact.
+     */
+    public static function deleteContactIfUnused(?string $oldContactId, string $newContactId): void
+    {
+        if (! $oldContactId || $oldContactId === $newContactId) {
+            return;
+        }
+        if (\App\Models\User::where('jeko_contact_id', $oldContactId)->exists()) {
+            return;
+        }
+        try { self::deleteContact($oldContactId); } catch (\Throwable) {}
+    }
+
     public static function deleteContact(string $contactId): void
     {
         Http::withHeaders([
