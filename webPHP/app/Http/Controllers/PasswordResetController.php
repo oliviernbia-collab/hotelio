@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class PasswordResetController extends Controller
 {
@@ -19,7 +20,17 @@ class PasswordResetController extends Controller
     {
         $request->validate(['email' => 'required|email']);
 
-        $status = Password::sendResetLink($request->only('email'));
+        // Serveur d'e-mail indisponible ou mal configuré : message clair plutôt qu'une erreur 500
+        // (l'incident reste consigné dans le journal pour diagnostic).
+        try {
+            $status = Password::sendResetLink($request->only('email'));
+        } catch (TransportExceptionInterface $e) {
+            report($e);
+
+            return back()->withInput()->withErrors([
+                'email' => "L'e-mail n'a pas pu être envoyé pour le moment. Réessayez dans quelques minutes.",
+            ]);
+        }
 
         return $status === Password::RESET_LINK_SENT
             ? back()->with('status', __($status))
